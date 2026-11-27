@@ -1053,16 +1053,22 @@ function showGate(msg, tab){
   if (!su) $("#gForm").onsubmit = async e => { e.preventDefault(); try { await auth.signInWithEmailAndPassword($("#gEm").value.trim(), $("#gPw").value); } catch { showGate("이메일이나 비밀번호가 맞지 않아요"); } };
   else $("#sForm").onsubmit = async e => { e.preventDefault(); const btn = $("#sBtn"); btn.disabled = true; btn.textContent = "보내는 중…";
     const name = $("#sName").value.trim(), em = $("#sEm").value.trim(), pw = $("#sPw").value;
-    signingUp = true;
+    signingUp = true; let cr = null;
     try {
-      const cr = await auth.createUserWithEmailAndPassword(em, pw);
+      cr = await auth.createUserWithEmailAndPassword(em, pw);
       await cr.user.updateProfile({ displayName: name });
       const ok = await sendRequest(cr.user, name);
       if (!ok) { gateMsg = [`오늘 가입 요청이 가득 찼어요 (하루 ${DAY_MAX}명까지). 내일 다시 시도해 주세요.`, "signup"]; signingUp = false; await cr.user.delete().catch(() => auth.signOut()); return; }
       cr.user.sendEmailVerification().catch(() => {});
       signingUp = false; showPending(cr.user, true);
-    } catch (ex) { signingUp = false; const c = ex.code || "";
-      showGate(c.includes("email-already-in-use") ? "이미 가입된 이메일이에요. 로그인해 보세요" : c.includes("weak-password") ? "비밀번호는 6자 이상이어야 해요" : c.includes("invalid-email") ? "이메일 주소를 확인해 주세요" : c.includes("operation-not-allowed") ? "관리자가 이메일 가입을 아직 켜지 않았어요" : "가입 요청을 보내지 못했어요", "signup"); }
+    } catch (ex) { const c = String(ex.code || ex.message || "");
+      const msg = c.includes("email-already-in-use") ? "이미 가입된 이메일이에요. 위 ‘로그인’ 탭에서 로그인하면 요청 상태를 볼 수 있어요"
+        : c.includes("weak-password") ? "비밀번호는 6자 이상이어야 해요" : c.includes("invalid-email") ? "이메일 주소를 확인해 주세요"
+        : c.includes("operation-not-allowed") ? "이메일 가입이 꺼져 있어요 (Firebase 콘솔 > Authentication > 로그인 방법 > 이메일/비밀번호)"
+        : /permission/i.test(c) ? "서버 권한 규칙이 아직 적용되지 않았어요. 관리자에게 알려 주세요 (Firestore 규칙)"
+        : c.includes("network") ? "인터넷 연결을 확인해 주세요" : `가입 요청을 보내지 못했어요 (${c || "알 수 없는 오류"})`;
+      if (cr && cr.user) { gateMsg = [msg, "signup"]; signingUp = false; await cr.user.delete().catch(() => auth.signOut()); return; }
+      signingUp = false; showGate(msg, "signup"); }
   };
 }
 let signingUp = false, gateMsg = null;
