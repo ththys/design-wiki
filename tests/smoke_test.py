@@ -38,7 +38,7 @@ with sync_playwright() as p:
     rows = pg.evaluate("document.querySelector('#ed table').rows.length")
     pg.click("#edSave"); pg.wait_for_timeout(300)
     doc = pg.inner_html("#pDoc")
-    check("새 페이지 게시: 제목·소제목·할 일·표", "#/p/" in pg.evaluate("location.hash") and ">핵심 규칙</h2>" in doc and 'class="check"' in doc and "<table>" in doc and rows == 4 and has_tbl_bar, f"{rows},{has_tbl_bar},{doc[:300]}")
+    check("새 페이지 게시: 제목·소제목·할 일·표", "#/p/" in pg.evaluate("location.hash") and ">핵심 규칙</h2>" in doc and 'class="check"' in doc and "<table" in doc and rows == 4 and has_tbl_bar, f"{rows},{has_tbl_bar},{doc[:300]}")
     pid = pg.evaluate("location.hash.split('/')[2]")
     check("트리에 표시", pg.locator(f'.trow[data-row="{pid}"]').count() == 1)
 
@@ -257,6 +257,25 @@ with sync_playwright() as p:
     pg.click("#createBtn"); pg.wait_for_timeout(200); pg.fill("#edTitle", "하위 확인"); pg.click("#ed"); pg.keyboard.type("본문"); pg.keyboard.press("Control+s"); pg.wait_for_timeout(300)
     par = pg.evaluate("(JSON.parse(localStorage.getItem('wiki-v1')).pages.find(p=>p.title==='하위 확인')||{}).parent")
     check("페이지 연 상태에서 만들기 → 하위 페이지", par == fid, f"{par},{fid}")
+
+    # 17) 표 정렬
+    tbl = "<table><tbody><tr><th>이름</th><th>공격력</th><th>마감</th></tr><tr><td>골렘</td><td>1,200</td><td><time class='date' datetime='2026-12-05'>x</time></td></tr><tr><td>가고일</td><td>80</td><td></td></tr><tr><td>나가</td><td>350</td><td><time class='date' datetime='2026-11-30'>x</time></td></tr><tr><td>몬스터10</td><td></td><td></td></tr><tr><td>몬스터2</td><td>12.5%</td><td></td></tr></tbody></table><ul class='check'><li>체크</li></ul>"
+    pg.evaluate("h => { const d = JSON.parse(localStorage.getItem('wiki-v1')); d.pages.push({id:'tb1',title:'표 정렬',html:h,parent:null,order:99,createdAt:1,updatedAt:1,createdBy:{name:'나'},updatedBy:{name:'나'},version:1}); localStorage.setItem('wiki-v1', JSON.stringify(d)); }", tbl)
+    pg.goto(URL + "#/p/tb1"); pg.reload(); pg.wait_for_timeout(300)
+    col = lambda i: pg.evaluate(f"[...document.querySelectorAll('#pDoc tr')].slice(1).map(r=>r.cells[{i}].textContent.trim())")
+    pg.locator("#pDoc th", has_text="이름").click(); a1 = col(0)
+    pg.locator("#pDoc th", has_text="공격력").click(); a2 = col(1); pg.locator("#pDoc th", has_text="공격력").click(); a3 = col(1)
+    pg.locator("#pDoc th", has_text="공격력").click(); a4 = col(0)
+    pg.locator("#pDoc th", has_text="마감").click(); a5 = col(0)
+    pg.locator("#pDoc ul.check li").click(position={"x": 5, "y": 8}); pg.wait_for_timeout(300)
+    saved = pg.evaluate("(()=>{const d=document.createElement('div');d.innerHTML=JSON.parse(localStorage.getItem('wiki-v1')).pages.find(p=>p.id==='tb1').html;return [...d.querySelectorAll('tr')].slice(1).map(r=>r.cells[0].textContent)})()")
+    ok = a1 == ["가고일", "골렘", "나가", "몬스터2", "몬스터10"] and a2[:4] == ["12.5%", "80", "350", "1,200"] and a2[4] == "" and a3[:4] == ["1,200", "350", "80", "12.5%"] and a3[4] == "" \
+         and a4 == ["골렘", "가고일", "나가", "몬스터10", "몬스터2"] and a5[:2] == ["나가", "골렘"] and saved == ["골렘", "가고일", "나가", "몬스터10", "몬스터2"]
+    check("표 머리 눌러 정렬 (가나다·숫자·날짜·빈칸 맨 뒤·원래대로, 저장엔 안 남음)", ok, f"{a1} {a2} {a3} {a4} {a5} {saved}")
+    pg.goto(URL + "#/p/tb1/edit"); pg.wait_for_timeout(300); pg.locator("#ed td", has_text="80").click(); pg.wait_for_timeout(100)
+    pg.click('.tblbar [data-t="sd"]'); pg.wait_for_timeout(100)
+    e1 = pg.evaluate("[...document.querySelectorAll('#ed tr')].slice(1).map(r=>r.cells[1].textContent.trim())")
+    check("편집 중 표 막대 정렬 ↓ (저장되는 정렬)", e1[:4] == ["1,200", "350", "80", "12.5%"] and pg.evaluate("document.querySelector('#ed tr').cells[0].tagName") == "TH", str(e1))
     check("자바스크립트 오류 없음", not errs, "; ".join(errs[:3]))
     b.close()
 srv.shutdown()
