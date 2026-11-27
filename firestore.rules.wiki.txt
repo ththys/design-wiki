@@ -16,11 +16,26 @@
     }
     match /wiki_history/{id} {
       allow read, create: if isWikiTeam();
+      // 영구 삭제한 페이지의 기록 정리
+      allow delete: if isWikiTeam() && !exists(/databases/$(database)/documents/wiki_pages/$(resource.data.pageId));
     }
     match /wiki_comments/{id} {
       allow read: if isWikiTeam();
       allow create: if isWikiTeam() && request.resource.data.by.email == request.auth.token.email;
-      allow delete: if isWikiTeam() && resource.data.by.email == request.auth.token.email;
+      // 편집(본인 글은 화면에서만 편집 단추), 할 일 체크·반응은 팀 누구나. 작성자·페이지·시간은 못 바꿈
+      allow update: if isWikiTeam() && request.resource.data.by == resource.data.by
+        && request.resource.data.pageId == resource.data.pageId && request.resource.data.at == resource.data.at;
+      allow delete: if isWikiTeam() && (resource.data.by.email == request.auth.token.email || isWikiAdmin()
+        || !exists(/databases/$(database)/documents/wiki_pages/$(resource.data.pageId)));
+    }
+    // 알림 (@멘션·답글·내 페이지 댓글): 받는 사람만 읽고 지움
+    match /wiki_notes/{id} {
+      allow read, update, delete: if request.auth != null && resource.data.to == request.auth.token.email;
+      allow create: if isWikiTeam() && request.resource.data.from.email == request.auth.token.email;
+    }
+    // @멘션에 쓰는 팀원 이름 목록
+    match /wiki_meta/people {
+      allow read, write: if isWikiTeam();
     }
     match /wiki_members/{email} {
       allow read: if isWikiAdmin() || (request.auth != null && request.auth.token.email == email);

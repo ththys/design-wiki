@@ -66,7 +66,7 @@ with sync_playwright() as p:
     check("수정 기록·되돌리기", n == 2 and pg.inner_text(".ptitle") == "전투 기획 개요" and "버전 3" in pg.inner_text(".byline"), str(n))
 
     # 4) 댓글
-    pg.fill("#cIn", "좋아요 확인했어요"); pg.click("#cAdd"); pg.wait_for_timeout(300)
+    pg.click("#cIn"); pg.keyboard.type("좋아요 확인했어요"); pg.click("[data-cadd]"); pg.wait_for_timeout(300)
     check("댓글 등록", "좋아요 확인했어요" in pg.inner_text("#cmtList"))
     pg.click("[data-cdel]"); pg.wait_for_timeout(100); pg.click("#askOk"); pg.wait_for_timeout(300)
     check("댓글 삭제", "좋아요 확인했어요" not in pg.inner_text("#cmtList"))
@@ -276,6 +276,39 @@ with sync_playwright() as p:
     pg.click('.tblbar [data-t="sd"]'); pg.wait_for_timeout(100)
     e1 = pg.evaluate("[...document.querySelectorAll('#ed tr')].slice(1).map(r=>r.cells[1].textContent.trim())")
     check("편집 중 표 막대 정렬 ↓ (저장되는 정렬)", e1[:4] == ["1,200", "350", "80", "12.5%"] and pg.evaluate("document.querySelector('#ed tr').cells[0].tagName") == "TH", str(e1))
+
+    # 18) 댓글: 서식·멘션·날짜·할 일·편집·답글·반응·링크·알림
+    pg.click("#edCancel"); pg.wait_for_timeout(100)
+    if pg.locator("#askOk").count(): pg.click("#askOk"); pg.wait_for_timeout(200)
+    pg.evaluate("""() => { const d = JSON.parse(localStorage.getItem('wiki-v1')); d.pages.push({id:'cm1',title:'댓글 시험',html:'<p>본문</p>',parent:null,order:120,createdAt:1,updatedAt:1,createdBy:{email:'kim@x.com',name:'김기획'},updatedBy:{email:'lee@x.com',name:'이영호'},version:1});
+      d.notes = [{id:'nn1',to:'',from:{email:'lee@x.com',name:'이영호'},kind:'mc',pageId:'cm1',cid:'',title:'댓글 시험',text:'봐 주세요',at:Date.now(),read:false}]; localStorage.setItem('wiki-v1', JSON.stringify(d)); }""")
+    pg.goto(URL + "#/p/cm1"); pg.reload(); pg.wait_for_timeout(400)
+    bell = pg.inner_text("#noteN") == "1"
+    pg.click("#cIn"); pg.keyboard.type("검토 **중요** 부탁"); pg.keyboard.press("Enter"); pg.keyboard.type("[] 수치 확인 "); pg.keyboard.type("@김"); pg.wait_for_timeout(100)
+    pick = pg.locator("#pick button", has_text="김기획").count() == 1; pg.keyboard.press("Enter"); pg.keyboard.type("//"); pg.wait_for_timeout(100); pg.keyboard.press("Escape")
+    pg.keyboard.press("Control+Enter"); pg.wait_for_timeout(400)
+    h = pg.inner_html("#cmtList")
+    rich = all(x in h for x in ["<b>중요</b>", 'class="check"', 'class="mention"', 'data-email="kim@x.com"', 'class="date"'])
+    nts = pg.evaluate("JSON.parse(localStorage.getItem('wiki-v1')).notes.filter(n=>n.to==='kim@x.com').map(n=>n.kind)")
+    check("댓글 서식·할 일·@멘션·// 날짜 + 멘션 알림(작성자 중복 없음)", bell and pick and rich and nts == ["mc"], f"{bell},{pick},{rich},{nts}")
+    cm = pg.locator("#cmtList .cmt").first
+    cm.locator("[data-cedit]").click(); pg.wait_for_timeout(100); pg.keyboard.type(" 수정"); pg.keyboard.press("Control+Enter"); pg.wait_for_timeout(300)
+    edited = "수정됨" in pg.inner_text("#cmtList") and "수정" in pg.inner_text("#cmtList .ct")
+    pg.locator("#cmtList .cmt").first.locator("[data-crep]").click(); pg.keyboard.type("답 달아요"); pg.keyboard.press("Control+Enter"); pg.wait_for_timeout(300)
+    reply = pg.locator("#cmtList .cmt.rep", has_text="답 달아요").count() == 1
+    pg.locator("#cmtList .cmt").first.locator("[data-cre]").first.click(); pg.click('.menu.reacts [data-pick="👍"]'); pg.wait_for_timeout(300)
+    react = pg.locator("#cmtList .rc", has_text="👍 1").count() == 1
+    li = pg.locator("#cmtList .ct ul.check li").first; li.click(position={"x": 6, "y": 8}); pg.wait_for_timeout(300)
+    done = 'class="done"' in pg.evaluate("JSON.parse(localStorage.getItem('wiki-v1')).comments.find(c=>c.pageId==='cm1' && !c.parent).html")
+    cid = pg.evaluate("JSON.parse(localStorage.getItem('wiki-v1')).comments.find(c=>c.pageId==='cm1' && !c.parent).id")
+    pg.goto(URL + "#/"); pg.wait_for_timeout(150); pg.goto(URL + f"#/p/cm1/c/{cid}"); pg.wait_for_timeout(400); flash = pg.locator(f"#c-{cid}.flash").count() == 1
+    check("댓글 편집·답글·반응·할 일 체크 저장·댓글 링크", edited and reply and react and done and flash, f"{edited},{reply},{react},{done},{flash}")
+    pg.click("#noteBtn"); pg.wait_for_timeout(100); pg.locator(".menu.notes [data-nid]").first.click(); pg.wait_for_timeout(300)
+    readok = pg.inner_text("#noteN") == "" and pg.evaluate("location.hash") == "#/p/cm1"
+    pg.goto(URL + "#/p/cm1/edit"); pg.wait_for_timeout(300); pg.locator("#ed p").last.click(); pg.keyboard.press("End"); pg.keyboard.type(" @이영"); pg.wait_for_timeout(100); pg.keyboard.press("Enter")
+    pg.keyboard.press("Control+s"); pg.wait_for_timeout(400)
+    mp = pg.evaluate("JSON.parse(localStorage.getItem('wiki-v1')).notes.filter(n=>n.to==='lee@x.com').map(n=>n.kind)")
+    check("알림 종: 눌러서 이동·읽음 / 페이지 본문 @멘션 알림", readok and mp == ["mp"] and pg.locator("#pDoc span.mention").count() == 1, f"{readok},{mp}")
     check("자바스크립트 오류 없음", not errs, "; ".join(errs[:3]))
     b.close()
 srv.shutdown()

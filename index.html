@@ -426,6 +426,40 @@ input:focus,textarea:focus,select:focus{border-color:var(--brand)}
 .ge-tbl th{position:sticky;top:0;background:var(--panel);text-align:left;color:var(--sub);padding:4px;border-bottom:1px solid var(--line)}
 .ge-tbl td{padding:3px 4px;border-bottom:1px solid var(--line2)} .ge-tbl td.mv{white-space:nowrap} .ge-tbl td.mv .ibtn{width:22px;height:22px}
 .ge-tbl input,.ge-tbl select{font-size:12px;height:28px;padding:2px 6px}
+
+/* ── 댓글·멘션·알림 ── */
+.mention{background:var(--sel);color:var(--brand);border-radius:10px;padding:0 6px;font-weight:500;white-space:nowrap}
+.mention.me{background:var(--brand);color:var(--brand-ink)}
+.cmt.rep{margin:10px 0 0} .cmt.rep .avatar{width:24px;height:24px;font-size:11px}
+.cmt.flash>.cb{animation:cflash 2.4s ease-out} @keyframes cflash{0%,40%{background:var(--warn)}100%{background:transparent}}
+.cmt .ct.doc{font-size:14px;line-height:1.6;white-space:normal} .cmt .ct.doc>*{margin:0 0 6px} .cmt .ct.doc>*:last-child{margin-bottom:0}
+.cmt .ct.doc ul.check li{margin:2px 0}
+.cacts{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:4px}
+.cacts .ca{font-size:12px;color:var(--muted);border:0;background:none;padding:2px 4px;cursor:pointer;border-radius:3px}
+.cacts .ca:hover{color:var(--ink);background:var(--hover)} .cacts .ca.del:hover{color:var(--danger)}
+.cacts .rc{font-size:12px;border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:1px 8px;cursor:pointer;color:var(--sub)}
+.cacts .rc.on{border-color:var(--brand);background:var(--sel);color:var(--brand)}
+.creps{margin-left:2px;border-left:2px solid var(--line2);padding-left:12px} .creps:empty{display:none}
+.crbox .cnew{margin-top:10px}
+.menu.reacts{display:flex;gap:2px;padding:4px;width:auto} .menu.reacts button{font-size:18px;padding:4px 6px;width:auto}
+.cnew .cwrap{flex:1;min-width:0}
+.rbar{display:flex;align-items:center;gap:1px;border:1px solid var(--line);border-bottom:0;border-radius:6px 6px 0 0;padding:3px 4px;background:var(--side);flex-wrap:wrap}
+.rbar button{border:0;background:none;min-width:26px;height:24px;border-radius:3px;cursor:pointer;color:var(--sub);font-size:13px}
+.rbar button:hover{background:var(--hover);color:var(--ink)} .rbar .sep{width:1px;height:16px;background:var(--line);margin:0 3px}
+.rbox{position:relative;border:1px solid var(--line);border-radius:0 0 6px 6px;padding:8px 10px;min-height:64px;max-height:50vh;overflow:auto;background:var(--panel);font-size:14px;line-height:1.6;outline:none}
+.rbox:focus{border-color:var(--brand);box-shadow:0 0 0 1px var(--brand)}
+.rbox>*{margin:0 0 6px} .rbox>*:last-child{margin-bottom:0}
+.rbox>p:only-child:has(br:only-child)::before{content:attr(data-ph);color:var(--muted);position:absolute;pointer-events:none}
+.rbox ul.check li{margin:2px 0}
+.cnew .row{display:flex;align-items:center;gap:6px;margin-top:6px} .chint{color:var(--muted);font-size:11px}
+.nbell{position:relative;font-size:15px} #noteN{position:absolute;top:2px;right:0;min-width:16px;height:16px;border-radius:8px;background:var(--danger);color:#fff;font-size:10px;font-weight:700;line-height:16px;padding:0 4px;font-style:normal}
+#noteN:empty{display:none}
+.menu.notes{width:340px;max-height:70vh;overflow:auto;padding:4px 0}
+.menu.notes .lnk{border:0;background:none;color:var(--brand);font-size:12px;cursor:pointer;width:auto;padding:0}
+.menu.notes .nt{display:flex;gap:10px;align-items:flex-start;text-align:left;white-space:normal;padding:9px 14px}
+.menu.notes .nt .avatar{width:28px;height:28px;font-size:12px;flex:none}
+.menu.notes .nt.new{background:var(--sel)} .menu.notes .nb{display:flex;flex-direction:column;gap:2px;font-size:13px;line-height:1.45;min-width:0}
+.menu.notes .nb small{color:var(--muted);font-size:11px} .menu.notes .nx{color:var(--sub)!important;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* 모달·토스트 */
 .scrim{position:fixed;inset:0;background:rgba(9,30,66,.54);z-index:50;display:grid;place-items:center;padding:20px}
 .modal{background:var(--panel);border-radius:6px;box-shadow:var(--shadow);width:min(560px,100%);max-height:calc(100vh - 40px);display:flex;flex-direction:column}
@@ -501,6 +535,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--brand)}
       <div class="sres" id="sres" hidden></div>
     </div>
     <div class="tright">
+      <button class="ibtn nbell" id="noteBtn" type="button" title="알림" aria-label="알림">🔔<span id="noteN"></span></button>
       <button class="ibtn" id="keysBtn" type="button" title="단축키 (?)" aria-label="단축키">⌨</button>
       <button class="ibtn" id="themeBtn" type="button" aria-label="화면 밝기"></button>
       <button class="avatar" id="meBtn" type="button" aria-label="내 계정"></button>
@@ -594,15 +629,42 @@ const store = {
     return local.read().comments.filter(c => c.pageId === pageId).sort((a, b) => a.at - b.at);
   },
   async addComment(c){
-    if (mode === "cloud") return fs.collection("wiki_comments").add(c);
-    const d = local.read(); d.comments.push({ id: uid(), ...c }); local.write(d);
+    if (mode === "cloud") return (await fs.collection("wiki_comments").add(c)).id;
+    const d = local.read(), id = uid(); d.comments.push({ id, ...c }); local.write(d); return id;
+  },
+  async updateComment(id, data){
+    if (mode === "cloud") return fs.collection("wiki_comments").doc(id).update(data);
+    const d = local.read(), i = d.comments.findIndex(c => c.id === id); if (i >= 0) d.comments[i] = { ...d.comments[i], ...data }; local.write(d);
+  },
+  async deleteRelated(pageIds){ /* 영구 삭제한 페이지의 수정 기록·댓글 정리 */
+    if (mode === "cloud") { for (const pid of pageIds) for (const col of ["wiki_history", "wiki_comments"]) {
+        try { const s = await fs.collection(col).where("pageId", "==", pid).get(); const b = fs.batch(); s.docs.forEach(x => b.delete(x.ref)); if (s.size) await b.commit(); } catch {} } return; }
+    const d = local.read(); d.history = d.history.filter(h => !pageIds.includes(h.pageId)); d.comments = d.comments.filter(c => !pageIds.includes(c.pageId)); local.write(d);
+  },
+  async addNotes(list){
+    if (mode === "cloud") { const b = fs.batch(); list.forEach(n => b.set(fs.collection("wiki_notes").doc(), n)); return b.commit(); }
+    const d = local.read(); d.notes = d.notes || []; list.forEach(n => d.notes.push({ id: uid(), ...n })); local.write(d); localNotesTick();
+  },
+  watchNotes(cb){
+    const em = (me().email || "").toLowerCase();
+    if (mode === "cloud") { if (!em) return () => {}; return fs.collection("wiki_notes").where("to", "==", em).onSnapshot(s => cb(s.docs.map(x => ({ id: x.id, ...x.data() }))), () => {}); }
+    const f = () => cb((local.read().notes || []).filter(n => n.to === em)); localNotesCb = f; f(); return () => { localNotesCb = null; };
+  },
+  async readNotes(ids){
+    if (mode === "cloud") { const b = fs.batch(); ids.forEach(id => b.update(fs.collection("wiki_notes").doc(id), { read: true })); return b.commit(); }
+    const d = local.read(); (d.notes || []).forEach(n => { if (ids.includes(n.id)) n.read = true; }); local.write(d); localNotesTick();
+  },
+  async delNotes(ids){
+    if (mode === "cloud") { const b = fs.batch(); ids.forEach(id => b.delete(fs.collection("wiki_notes").doc(id))); return b.commit(); }
+    const d = local.read(); d.notes = (d.notes || []).filter(n => !ids.includes(n.id)); local.write(d); localNotesTick();
   },
   async delComment(id){
     if (mode === "cloud") return fs.collection("wiki_comments").doc(id).delete();
     const d = local.read(); d.comments = d.comments.filter(c => c.id !== id); local.write(d);
   },
 };
-function loadLocal(){ setPages(local.read().pages); ready = true; renderTree(); route(true); }
+let localNotesCb = null; const localNotesTick = () => { if (localNotesCb) localNotesCb(); };
+function loadLocal(){ setPages(local.read().pages); const first = !ready; ready = true; renderTree(); route(true); if (first) startNotes(); }
 
 /* ───────── HTML 정리 (붙여 넣기·저장·보기 공통) ───────── */
 const KEEP = new Set(["P","H1","H2","H3","H4","H5","H6","SUB","SUP","MARK","B","I","U","S","A","UL","OL","LI","BLOCKQUOTE","PRE","CODE","HR","BR","TABLE","THEAD","TBODY","TR","TH","TD","FIGURE","FIGCAPTION","IMG","VIDEO","DIV"]);
@@ -621,6 +683,8 @@ function sanitize(html){
         const e = doc.createElement("time"); e.className = "date"; e.setAttribute("datetime", d); e.textContent = fmtDate(d); out.appendChild(e); return; }
       if (t === "SPAN") { if (n.classList && n.classList.contains("status")) { const c = STATUS_COLORS.map(x => x[0]).find(k => n.classList.contains(k)) || "grey";
           const e = doc.createElement("span"); e.className = "status " + c; e.textContent = (n.textContent || "").replace(/\u200b/g, "").trim().slice(0, 40) || "상태"; out.appendChild(e); return; }
+        if (n.classList && n.classList.contains("mention")) { const em = (n.getAttribute("data-email") || "").toLowerCase();
+          if (/^[^\s@<>"']+@[^\s@<>"']+$/.test(em)) { const e = doc.createElement("span"); e.className = "mention"; e.setAttribute("data-email", em); e.textContent = "@" + (n.textContent || "").replace(/\u200b/g, "").replace(/^@/, "").trim().slice(0, 40); out.appendChild(e); return; } }
         walk(n, out); return; }
       if (t === "DIV" && n.classList) { const cl = n.classList;
         if (cl.contains("expand")) { const e = doc.createElement("div"); e.className = "expand";
@@ -715,7 +779,7 @@ function wireExtras(root){
 }
 /* 편집기: 글자 상자(날짜·상태)·자리 상자(목차·불러오기) 준비 */
 function prepEditor(root){
-  root.querySelectorAll("span.status,time.date,div.toc,div.include").forEach(x => x.contentEditable = "false");
+  root.querySelectorAll("span.status,span.mention,time.date,div.toc,div.include").forEach(x => x.contentEditable = "false");
   root.querySelectorAll("div.flow").forEach(prepFlowBlock); root.querySelectorAll("div.gantt").forEach(prepGanttBlock);
   root.querySelectorAll("div.toc").forEach(x => x.textContent = "목차 — 보기 화면에서 이 페이지의 제목들이 여기에 나와요");
   root.querySelectorAll("div.include").forEach(x => { const t = byId(x.dataset.page); x.textContent = "📄 페이지 불러오기: " + (t ? (t.title || "제목 없음") : "지워진 페이지") + " — 보기 화면에서 그 페이지 내용이 여기에 나와요"; });
@@ -1519,9 +1583,200 @@ function unsortClone(root){ /* 저장할 때는 보기 정렬을 되돌린 원�
   const c = root.cloneNode(true); c.querySelectorAll("table[data-sorted]").forEach(t => sortTable(t, 0, 0)); return c;
 }
 
+/* ───────── 글 입력 공용 (페이지 편집기·댓글 상자) ───────── */
+function richInput(e, allowSlash){ /* 글자로 치는 서식 (한글 입력기에서도 먹도록 키 대신 입력 뒤에 확인) */
+  autoUndo = null; closePop();
+  const s = getSelection(); if (!s.rangeCount) return; const n = s.anchorNode;
+  if (e.inputType === "insertText" && n && n.nodeType === 3) {
+    const o = s.anchorOffset, before = n.data.slice(0, o), inCode = !!n.parentElement.closest("pre,code"), sp = ch => ch === undefined || /[\s ]/.test(ch);
+    if (e.data === " " && blockAuto()) { closePicker(); return; }
+    if (!inCode && inlineAuto(e.data)) return;
+    if (!inCode && before.endsWith("//") && sp(before[o - 3])) { closePicker(); n.deleteData(o - 2, 2); caretTo(n, o - 2); saveSel(); const t = newChip(dateChip()); if (t) openDatePop(t, false); return; }
+    if (before.endsWith("[[")) { n.deleteData(o - 2, 2); openPicker(""); }
+    else if (!inCode && allowSlash && before.endsWith("/") && sp(before[o - 2])) openSlash(n, o, "slash");
+    else if (!inCode && before.endsWith(":") && sp(before[o - 2])) openSlash(n, o, "emoji");
+    else if (!inCode && before.endsWith("@") && sp(before[o - 2])) openSlash(n, o, "mention");
+  } else if (e.inputType === "insertText" && n && n.nodeType === 1 && e.data === " ") blockAuto();
+  if (pickState) updatePicker();
+}
+/* ───────── 사람 목록 (@멘션) ───────── */
+let peopleDoc = {}, lastComments = [];
+function people(){
+  const m = new Map(), add = p => { if (!p || !p.email) return; const e = String(p.email).toLowerCase(); if (!m.get(e)) m.set(e, p.name || e.split("@")[0]); };
+  Object.entries(peopleDoc).forEach(([e, v]) => add({ email: e, name: v && v.name }));
+  (typeof members !== "undefined" ? members : []).forEach(x => add({ email: x.id || x.email, name: x.name }));
+  allPages.forEach(p => { add(p.createdBy); add(p.updatedBy); add(p.trashedBy); }); lastComments.forEach(c => add(c.by)); add(me());
+  return [...m].map(([email, name]) => ({ email, name })).sort((a, b) => KO_SORT.compare(a.name, b.name));
+}
+const mentionHTML = p => `<span class="mention" data-email="${esc(p.email)}">@${esc(p.name)}</span>`;
+const mentionsOf = html => { const d = document.createElement("div"); d.innerHTML = html || ""; return [...new Set([...d.querySelectorAll("span.mention[data-email]")].map(x => x.dataset.email.toLowerCase()))]; };
+function markMe(root){ const em = (me().email || "").toLowerCase(); if (em) root.querySelectorAll("span.mention").forEach(x => x.classList.toggle("me", x.dataset.email === em)); }
+/* ───────── 알림 ───────── */
+let notes = [], unsubNotes = null;
+const NOTE_TXT = { mc: "댓글에서 회원님을 언급했어요", mp: "페이지에서 회원님을 언급했어요", rp: "회원님 댓글에 답글을 달았어요", cm: "회원님이 만든 페이지에 댓글을 남겼어요" };
+async function notify(kind, toList, pageId, cid, text){
+  const m = me(), mine = (m.email || "").toLowerCase();
+  const to = [...new Set(toList.map(x => String(x || "").toLowerCase()).filter(x => x && x !== mine))]; if (!to.length) return;
+  const p = byId(pageId);
+  try { await store.addNotes(to.map(t => ({ to: t, from: m, kind, pageId, cid: cid || "", title: (p && p.title) || "", text: String(text || "").replace(/\s+/g, " ").trim().slice(0, 140), at: Date.now(), read: false }))); } catch {}
+}
+function paintNotes(){
+  const n = notes.filter(x => !x.read).length, b = $("#noteN"); if (b) b.textContent = n ? (n > 99 ? "99+" : n) : "";
+  const m = document.querySelector(".menu.notes"); if (m) fillNoteMenu(m);
+}
+function startNotes(){
+  if (unsubNotes) unsubNotes();
+  unsubNotes = store.watchNotes(list => { notes = list.sort((a, b) => b.at - a.at); paintNotes();
+    const old = notes.filter(x => x.read && x.at < Date.now() - 30 * 864e5).map(x => x.id); if (old.length) store.delNotes(old).catch(() => {}); });
+}
+function fillNoteMenu(m){
+  m.innerHTML = `<div class="mhd" style="display:flex;align-items:center">알림<span style="flex:1"></span>${notes.some(x => !x.read) ? `<button type="button" class="lnk" data-nall>모두 읽음</button>` : ""}</div>` +
+    (notes.length ? notes.slice(0, 40).map(x => `<button type="button" class="nt${x.read ? "" : " new"}" data-nid="${esc(x.id)}"><span class="avatar">${esc(initials(x.from && x.from.name))}</span>
+      <span class="nb"><span><b>${esc((x.from && x.from.name) || "누군가")}</b>님이 ${x.title ? `<b>‘${esc(x.title)}’</b> ` : ""}${esc(NOTE_TXT[x.kind] || "알림을 보냈어요")}</span>${x.text ? `<small class="nx">${esc(x.text)}</small>` : ""}<small>${when(x.at)}</small></span></button>`).join("")
+      : `<div style="padding:18px 14px;color:var(--muted);font-size:13px">새 알림이 없어요.<br>누가 @멘션하거나 답글을 달면 여기 떠요.</div>`);
+}
+function noteMenu(anchor){
+  closeMenus(); const m = document.createElement("div"); m.className = "menu notes"; fillNoteMenu(m); document.body.appendChild(m);
+  const r = anchor.getBoundingClientRect(); m.style.top = (r.bottom + 6) + "px"; m.style.left = Math.max(8, Math.min(r.right - 340, innerWidth - 348)) + "px";
+  m.onclick = e => {
+    if (e.target.closest("[data-nall]")) { const ids = notes.filter(x => !x.read).map(x => x.id); store.readNotes(ids).catch(() => {}); return; }
+    const b = e.target.closest("[data-nid]"); if (!b) return; const x = notes.find(y => y.id === b.dataset.nid); if (!x) return;
+    if (!x.read) store.readNotes([x.id]).catch(() => {}); closeMenus();
+    if (!byId(x.pageId)) { toast("페이지가 지워졌거나 휴지통에 있어요"); return; }
+    location.hash = "#/p/" + x.pageId + (x.cid ? "/c/" + x.cid : "");
+  };
+}
+/* ───────── 댓글 ───────── */
+const REACTS = ["👍", "❤️", "😂", "🎉", "👀", "✅"];
+const isEmptyRich = el => !el.textContent.replace(/[\s ​]/g, "") && !el.querySelector("img,video,time,span.status,span.mention");
+function richBox(el, opt){
+  el.contentEditable = "true"; el.classList.add("doc", "rbox"); el.setAttribute("data-ph", opt.placeholder || "");
+  if (!el.innerHTML.trim()) el.innerHTML = "<p><br></p>";
+  prepEditor(el);
+  const take = () => { if (!editing) ed = el; };
+  el.addEventListener("focus", take); el.addEventListener("mousedown", take);
+  ["keyup", "mouseup", "input"].forEach(k => el.addEventListener(k, () => { if (ed === el) saveSel(); }));
+  el.addEventListener("paste", e => { const h = e.clipboardData.getData("text/html"), t = e.clipboardData.getData("text/plain"); if (!h && !t) return; e.preventDefault();
+    if (h) document.execCommand("insertHTML", false, sanitize(h)); else document.execCommand("insertText", false, t); });
+  el.addEventListener("keydown", e => {
+    take(); if (pickState && pickKey(e)) return;
+    const mod = e.ctrlKey || e.metaKey, c = e.code;
+    if (mod && (c === "Enter" || c === "NumpadEnter")) { e.preventDefault(); opt.onSubmit(); return; }
+    if (e.key === "Escape" && opt.onCancel && !popEl) { e.preventDefault(); opt.onCancel(); return; }
+    if (mod && !e.altKey && !e.shiftKey && c === "KeyZ" && autoUndo) { e.preventDefault(); undoAuto(); return; }
+    if (mod && !e.altKey && !e.shiftKey && c === "KeyK") { e.preventDefault(); richLink(el); return; }
+    if (mod && e.shiftKey && !e.altKey) { const f = { Digit7: () => listToggle("ol"), Digit8: () => listToggle("ul"), KeyS: () => document.execCommand("strikeThrough"), KeyM: inlineCode }[c]; if (f) { e.preventDefault(); f(); } }
+  });
+  el.addEventListener("input", e => richInput(e, false));
+  el.addEventListener("click", e => {
+    const chip = e.target.closest("time.date"); if (chip) { take(); openDatePop(chip, true); return; }
+    const li = e.target.closest("ul.check>li"); if (li) { const r = li.getBoundingClientRect(); if (e.clientX - r.left < 26) { li.classList.toggle("done"); e.preventDefault(); } }
+  });
+  const bar = document.createElement("div"); bar.className = "rbar";
+  bar.innerHTML = `<button type="button" data-r="bold" title="굵게 (Ctrl+B)"><b>B</b></button><button type="button" data-r="italic" title="기울임 (Ctrl+I)"><i>I</i></button><button type="button" data-r="underline" title="밑줄 (Ctrl+U)"><u>U</u></button><button type="button" data-r="strikeThrough" title="취소선"><s>S</s></button>
+    <span class="sep"></span><button type="button" data-r="ul" title="글머리 목록 (* 띄어쓰기)">•</button><button type="button" data-r="ol" title="번호 목록 (1. 띄어쓰기)">1.</button><button type="button" data-r="check" title="할 일 ([] 띄어쓰기)">☑</button>
+    <span class="sep"></span><button type="button" data-r="link" title="링크 (Ctrl+K)">🔗</button><button type="button" data-r="at" title="멘션 (@)">@</button><button type="button" data-r="date" title="날짜 (//)">📅</button><button type="button" data-r="emoji" title="이모지 (:)">😊</button><button type="button" data-r="page" title="페이지 링크 ([[)">📄</button>`;
+  bar.addEventListener("mousedown", e => e.preventDefault());
+  bar.onclick = e => { const b = e.target.closest("[data-r]"); if (!b) return; const k = b.dataset.r; el.focus(); take(); if (!el.contains(getSelection().anchorNode)) placeEnd();
+    if (["bold", "italic", "underline", "strikeThrough"].includes(k)) document.execCommand(k);
+    else if (k === "ul" || k === "ol") listToggle(k);
+    else if (k === "check") { const bl = nearBlock(); if (bl && bl.matches("p,h1,h2,h3,h4,h5,h6") && !bl.closest("li")) convertBlock(bl, "[]"); }
+    else if (k === "link") richLink(el);
+    else if (k === "date") { saveSel(); const t = newChip(dateChip()); if (t) openDatePop(t, false); }
+    else { const ch = { at: "@", emoji: ":", page: "[[" }[k], s = getSelection(), n = s.anchorNode, o = s.anchorOffset;
+      const prev = n && n.nodeType === 3 ? n.data[o - 1] : undefined; document.execCommand("insertText", false, (prev && !/[\s ]/.test(prev) && k !== "page" ? " " : "") + ch); }
+  };
+  el.before(bar);
+  return { html: () => sanitize(el.innerHTML), empty: () => isEmptyRich(el), clear: () => { el.innerHTML = "<p><br></p>"; }, el };
+}
+function richLink(el){
+  const s = getSelection(), txt = s.toString(); saveSel(); const keep = savedSel;
+  askText("링크 주소", "https://", u => { u = (u || "").trim(); el.focus(); savedSel = keep; restoreSel(); if (!/^(https?:|mailto:)/i.test(u)) return;
+    if (txt) document.execCommand("createLink", false, u); else document.execCommand("insertHTML", false, `<a href="${esc(u)}">${esc(u)}</a>&nbsp;`); }, "https://…");
+}
+const commentBody = c => c.html ? sanitize(c.html) : `<p>${esc(c.text || "").replace(/\n/g, "<br>")}</p>`;
+function commentHTML(c, mine, isReply){
+  const re = c.re || {}, myE = (me().email || "").toLowerCase();
+  const chips = REACTS.filter(r => (re[r] || []).length).map(r => { const who = re[r]; const on = who.some(x => x.e === myE);
+    return `<button type="button" class="rc${on ? " on" : ""}" data-re="${r}" title="${esc(who.map(x => x.n).join(", "))}">${r} ${who.length}</button>`; }).join("");
+  const own = !mine || (c.by && String(c.by.email || "").toLowerCase() === mine);
+  return `<div class="cmt${isReply ? " rep" : ""}" id="c-${esc(c.id)}" data-cid="${esc(c.id)}"><span class="avatar">${esc(initials(c.by && c.by.name))}</span><div class="cb">
+    <div class="cm"><b>${esc((c.by && c.by.name) || "")}</b>${when(c.at)}${c.editedAt ? ` <span title="${esc(new Date(c.editedAt).toLocaleString("ko-KR"))}">· 수정됨</span>` : ""}</div>
+    <div class="ct doc">${commentBody(c)}</div>
+    <div class="cacts">${chips}<button type="button" class="ca" data-cre title="반응">😊+</button>${isReply ? "" : `<button type="button" class="ca" data-crep>답글</button>`}
+      ${own ? `<button type="button" class="ca" data-cedit>편집</button>` : ""}<button type="button" class="ca" data-clink>링크</button>${own ? `<button type="button" class="ca del" data-cdel>삭제</button>` : ""}</div>
+    ${isReply ? "" : `<div class="creps"></div>`}</div></div>`;
+}
+function newCommentBox(host, pageId, parent, onDone){
+  host.innerHTML = `<div class="cnew"><span class="avatar" style="cursor:default">${esc(initials(me().name))}</span><div class="cwrap"><div class="cin" ${parent ? "" : 'id="cIn"'}></div>
+    <div class="row"><small class="chint">**굵게** · [] 할 일 · // 날짜 · @ 멘션 · [[ 페이지 · Ctrl+Enter 등록</small><span style="flex:1"></span>${parent ? `<button class="btn subtle sm" data-ccancel>취소</button>` : ""}<button class="btn primary sm" data-cadd>${parent ? "답글" : "등록"}</button></div></div></div>`;
+  const box = host.querySelector(".cin");
+  const cancel = parent ? () => { host.innerHTML = ""; } : null;
+  const go = () => addComment(pageId, rb, parent, host, onDone);
+  const rb = richBox(box, { placeholder: parent ? "답글 남기기" : "댓글 남기기", onSubmit: go, onCancel: cancel });
+  host.querySelector("[data-cadd]").onclick = go; const cc = host.querySelector("[data-ccancel]"); if (cc) cc.onclick = cancel;
+  return rb;
+}
+async function loadComments(id){
+  const box = $("#cmtList"); if (!box) return;
+  let list = []; try { list = await store.comments(id); } catch { box.textContent = "댓글을 불러오지 못했어요"; return; }
+  if (parseHash().id !== id || !$("#cmtList")) return;
+  lastComments = list;
+  const mine = (me().email || "").toLowerCase(), ids = new Set(list.map(c => c.id));
+  const roots = list.filter(c => !c.parent || !ids.has(c.parent)), reps = list.filter(c => c.parent && ids.has(c.parent));
+  box.style.cssText = "";
+  box.innerHTML = roots.length ? roots.map(c => commentHTML(c, mine, false).replace('<div class="creps"></div>', `<div class="creps">${reps.filter(r => r.parent === c.id).map(r => commentHTML(r, mine, true)).join("")}<div class="crbox"></div></div>`)).join("")
+    : `<p style="color:var(--muted);font-size:13px;margin:0 0 14px">첫 댓글을 남겨 보세요.</p>`;
+  box.querySelectorAll(".ct").forEach(x => { fixLinks(x); markMe(x); });
+  const r = parseHash(); if (r.c) { const el = document.getElementById("c-" + r.c); if (el) { el.scrollIntoView({ block: "center" }); el.classList.add("flash"); setTimeout(() => el.classList.remove("flash"), 2400); } }
+}
+function wireComments(id){
+  const list = $("#cmtList");
+  newCommentBox($("#cNewHost"), id, null);
+  list.addEventListener("click", async e => {
+    const cm = e.target.closest(".cmt"); if (!cm) return; const cid = cm.dataset.cid, c = lastComments.find(x => x.id === cid); if (!c) return;
+    const li = e.target.closest(".ct ul.check>li"); /* 댓글 속 할 일 체크 */
+    if (li && !e.target.closest(".rbox")) { const r = li.getBoundingClientRect(); if (e.clientX - r.left > 26) return; li.classList.toggle("done");
+      const html = sanitize(li.closest(".ct").innerHTML); try { await store.updateComment(cid, { html, text: plainOf(html).slice(0, 5000) }); c.html = html; } catch (ex) { li.classList.toggle("done"); toast(errMsg(ex)); } return; }
+    if (e.target.closest("[data-cdel]")) { askModal("댓글 지우기", "이 댓글을 지울까요?" + (lastComments.some(x => x.parent === cid) ? "<br><small style='color:var(--muted)'>답글은 남아요.</small>" : ""), "지우기", async () => { try { await store.delComment(cid); loadComments(id); } catch (ex) { toast(errMsg(ex)); } }, true); return; }
+    if (e.target.closest("[data-clink]")) { const u = location.href.split("#")[0] + "#/p/" + id + "/c/" + cid; (navigator.clipboard ? navigator.clipboard.writeText(u) : Promise.reject()).then(() => toast("댓글 링크를 복사했어요"), () => askText("이 주소를 복사하세요", u, () => {})); return; }
+    if (e.target.closest("[data-crep]")) { const host = cm.querySelector(".crbox"); if (host.innerHTML) { host.querySelector(".cin").focus(); return; }
+      const rb = newCommentBox(host, id, cid); rb.el.focus(); return; }
+    if (e.target.closest("[data-cedit]")) { const ct = cm.querySelector(":scope>.cb>.ct"); if (ct.classList.contains("editing")) return;
+      ct.classList.add("editing"); const was = ct.innerHTML; ct.innerHTML = `<div class="cin">${commentBody(c)}</div><div class="row" style="margin-top:6px"><span style="flex:1"></span><button class="btn subtle sm" data-ecan>취소</button><button class="btn primary sm" data-esave>저장</button></div>`;
+      const close = () => { ct.classList.remove("editing"); ct.innerHTML = was; };
+      const save = async () => { if (rb.empty()) { toast("내용을 입력해 주세요"); return; } const html = rb.html(), old = mentionsOf(c.html);
+        try { await store.updateComment(cid, { html, text: plainOf(html).slice(0, 5000), editedAt: Date.now() }); notify("mc", mentionsOf(html).filter(x => !old.includes(x)), id, cid, plainOf(html)); loadComments(id); } catch (ex) { toast(errMsg(ex)); } };
+      const rb = richBox(ct.querySelector(".cin"), { placeholder: "댓글", onSubmit: save, onCancel: close });
+      ct.querySelector("[data-ecan]").onclick = close; ct.querySelector("[data-esave]").onclick = save; rb.el.focus(); caretIn(rb.el.lastElementChild || rb.el, true); return; }
+    const reb = e.target.closest("[data-re],[data-cre]");
+    if (reb) { const toggle = async emo => { const myE = (me().email || "").toLowerCase(), re = JSON.parse(JSON.stringify(c.re || {})), arr = re[emo] || [];
+        const i = arr.findIndex(x => x.e === myE); if (i >= 0) arr.splice(i, 1); else arr.push({ e: myE, n: me().name }); if (arr.length) re[emo] = arr; else delete re[emo];
+        try { await store.updateComment(cid, { re }); c.re = re; loadComments(id); } catch (ex) { toast(errMsg(ex)); } };
+      if (reb.dataset.re) { toggle(reb.dataset.re); return; }
+      closeMenus(); const m = document.createElement("div"); m.className = "menu reacts"; m.innerHTML = REACTS.map(r => `<button type="button" data-pick="${r}">${r}</button>`).join("");
+      document.body.appendChild(m); const rr = reb.getBoundingClientRect(); m.style.top = (rr.bottom + 4) + "px"; m.style.left = rr.left + "px";
+      m.onclick = ev => { const b = ev.target.closest("[data-pick]"); if (b) { closeMenus(); toggle(b.dataset.pick); } }; return; }
+  });
+}
+async function addComment(pageId, rb, parent, host, onDone){
+  if (rb.empty()) return; const html = rb.html(), text = plainOf(html).slice(0, 5000), btn = host.querySelector("[data-cadd]"); if (btn) btn.disabled = true;
+  try {
+    const c = { pageId, html, text, at: Date.now(), by: me() }; if (parent) c.parent = parent;
+    const cid = await store.addComment(c);
+    const ments = mentionsOf(html); notify("mc", ments, pageId, cid, text);
+    if (parent) { const pc = lastComments.find(x => x.id === parent); if (pc && pc.by && !ments.includes(String(pc.by.email).toLowerCase())) notify("rp", [pc.by.email], pageId, cid, text); }
+    const pg = byId(pageId), author = pg && pg.createdBy && String(pg.createdBy.email || "").toLowerCase();
+    if (author && !ments.includes(author) && !(parent && (lastComments.find(x => x.id === parent) || {}).by?.email?.toLowerCase() === author)) notify("cm", [author], pageId, cid, text);
+    if (parent) host.innerHTML = ""; else rb.clear();
+    await loadComments(pageId); if (onDone) onDone();
+  } catch (ex) { toast(errMsg(ex)); }
+  if (btn && btn.isConnected) btn.disabled = false;
+}
+
 /* ───────── 라우팅 ───────── */
 function parseHash(){ const h = decodeURIComponent(location.hash.replace(/^#\/?/, "")); const [a, b, c] = h.split("/");
-  if (a === "p" && b) return { v: c === "edit" ? "edit" : "page", id: b };
+  if (a === "p" && b) return c === "edit" ? { v: "edit", id: b } : { v: "page", id: b, c: c === "c" ? h.split("/")[3] : null };
   if (a === "new") return { v: "new", parent: b || null };
   if (a === "recent") return { v: "recent" };
   if (a === "trash") return { v: "trash" };
@@ -1626,7 +1881,7 @@ async function movePage(id, parent, refId, after){
   catch (ex) { toast(errMsg(ex)); }
 }
 function closeMenus(){ document.querySelectorAll(".menu").forEach(m => m.remove()); }
-document.addEventListener("click", e => { if (!e.target.closest(".menu,[data-tmore],#meBtn,#pMore,#themeBtn")) closeMenus(); });
+document.addEventListener("click", e => { if (!e.target.closest(".menu,[data-tmore],#meBtn,#pMore,#themeBtn,#noteBtn,[data-cre]")) closeMenus(); });
 function showMenu(items, anchor, x, y){
   closeMenus(); const m = document.createElement("div"); m.className = "menu";
   m.innerHTML = items.map((it, i) => it === "-" ? "<hr>" : it.head ? `<div class="mhd">${esc(it.head)}</div>` : `<button type="button" data-i="${i}" class="${it.danger ? "danger" : ""}">${esc(it.label)}</button>`).join("");
@@ -1688,7 +1943,7 @@ let purging = false;
 async function purgeOld(){ /* 휴지통에 7일 넘은 페이지 영구 삭제 — 누가 위키를 열든 그때 정리 */
   if (purging) return; const limit = Date.now() - TRASH_DAYS * 864e5;
   const old = allPages.filter(p => p.trashedAt && p.trashedAt < limit).map(p => p.id); if (!old.length) return;
-  purging = true; try { await store.deletePages(old); } catch {} purging = false;
+  purging = true; try { await store.deletePages(old); await store.deleteRelated(old); } catch {} purging = false;
 }
 function showTrash(){
   renderTree(); document.title = "휴지통 · " + SPACE;
@@ -1708,7 +1963,7 @@ function showTrash(){
     renderExtras($("#tvDoc"), g.root.id); $("#tvR").onclick = () => { closeModal(); restoreTrash(g.id); }; });
   main().querySelectorAll("[data-td]").forEach(b => b.onclick = () => { const g = find(b.dataset.td); if (!g) return;
     askModal("영구 삭제", `‘${esc(g.root.title || "제목 없음")}’${g.list.length > 1 ? `과 하위 ${g.list.length - 1}개` : ""}를 영구 삭제할까요?<br><span style="color:var(--muted);font-size:13px">되살릴 수 없어요.</span>`, "영구 삭제",
-      async () => { try { await store.deletePages(g.list.map(p => p.id)); toast("영구 삭제했어요"); } catch (ex) { toast(errMsg(ex)); } }, true); });
+      async () => { try { const ids = g.list.map(p => p.id); await store.deletePages(ids); store.deleteRelated(ids); toast("영구 삭제했어요"); } catch (ex) { toast(errMsg(ex)); } }, true); });
 }
 
 /* ───────── 화면: 홈·최근·검색 ───────── */
@@ -1795,11 +2050,9 @@ function showPage(id){
     <div class="below ${full ? "full" : ""}" style="${full ? "--cw:100%" : ""}">
       ${kids(id).length ? `<div class="blinks"><h4>하위 페이지</h4>${kids(id).map(x => `<a href="#/p/${esc(x.id)}">${esc(x.title || "제목 없음")}</a>`).join("")}</div>` : ""}
       ${back.length ? `<div class="blinks"><h4>이 페이지를 링크한 곳 ${back.length}</h4>${back.map(x => `<a href="#/p/${esc(x.id)}">${esc(x.title || "제목 없음")}</a>`).join("")}</div>` : ""}
-      <div class="comments" id="cmts"><h4>댓글</h4><div id="cmtList" style="color:var(--muted);font-size:13px">불러오는 중…</div>
-        <div class="cnew"><span class="avatar" style="cursor:default">${esc(initials(me().name))}</span><div style="flex:1"><textarea id="cIn" placeholder="댓글 남기기 (Ctrl+Enter로 등록)"></textarea>
-        <div class="row"><button class="btn primary sm" id="cAdd">등록</button></div></div></div></div>
+      <div class="comments" id="cmts"><h4>댓글</h4><div id="cmtList" style="color:var(--muted);font-size:13px">불러오는 중…</div><div id="cNewHost"></div></div>
     </div>`;
-  const d = $("#pDoc"); fixLinks(d); renderExtras(d, id); wireExtras(d);
+  const d = $("#pDoc"); fixLinks(d); renderExtras(d, id); wireExtras(d); markMe(d);
   d.addEventListener("click", async e => { /* 보기 화면에서 체크리스트 누르면 바로 저장 */
     const li = e.target.closest("ul.check>li"); if (!li || li.closest(".include")) return; const r = li.getBoundingClientRect(); if (e.clientX - r.left > 26) return;
     li.classList.toggle("done"); const html = sanitize(unsortClone(d).innerHTML);
@@ -1813,26 +2066,7 @@ function showPage(id){
     { label: "복제", run: () => duplicatePage(id) },
     { label: "링크 복사", run: () => copyLink(id) },
     "-", { label: "삭제", danger: true, run: () => deletePage(id) }], e.currentTarget);
-  loadComments(id);
-  $("#cAdd").onclick = () => addComment(id);
-  $("#cIn").addEventListener("keydown", e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); addComment(id); } });
-}
-async function loadComments(id){
-  const box = $("#cmtList"); if (!box) return;
-  let list = []; try { list = await store.comments(id); } catch { box.textContent = "댓글을 불러오지 못했어요"; return; }
-  if (parseHash().id !== id || !$("#cmtList")) return;
-  const mine = me().email;
-  box.style.cssText = ""; box.innerHTML = list.length ? list.map(c => `<div class="cmt"><span class="avatar">${esc(initials(c.by && c.by.name))}</span><div class="cb">
-    <div class="cm"><b>${esc((c.by && c.by.name) || "")}</b>${when(c.at)}</div><div class="ct">${esc(c.text)}</div>
-    ${(!mine || (c.by && c.by.email === mine)) ? `<button class="cx" data-cdel="${esc(c.id)}">삭제</button>` : ""}</div></div>`).join("") : `<p style="color:var(--muted);font-size:13px;margin:0 0 14px">첫 댓글을 남겨 보세요.</p>`;
-  box.querySelectorAll("[data-cdel]").forEach(b => b.onclick = async () => { askModal("댓글 지우기", "이 댓글을 지울까요?", "지우기", async () => { try { await store.delComment(b.dataset.cdel); loadComments(id); } catch (ex) { toast(errMsg(ex)); } }, true); });
-}
-async function addComment(id){
-  const t = $("#cIn"), v = t.value.trim(); if (!v) return;
-  t.disabled = true;
-  try { await store.addComment({ pageId: id, text: v.slice(0, 5000), at: Date.now(), by: me() }); t.value = ""; loadComments(id); }
-  catch (ex) { toast(errMsg(ex)); }
-  t.disabled = false; t.focus();
+  wireComments(id); loadComments(id);
 }
 
 /* ───────── 수정 기록 ───────── */
@@ -2022,20 +2256,8 @@ function wireEditor(id, isNew){
         e.preventDefault(); pb.remove(); const p = document.createElement("p"); p.innerHTML = "<br>"; pan.after(p); caretIn(p); return; }
     }
   });
-  ed.addEventListener("input", e => { /* 글자로 치는 서식 (한글 입력기에서도 먹도록 키 대신 입력 뒤에 확인) */
-    autoUndo = null; closePop();
-    const s = getSelection(); if (!s.rangeCount) return; const n = s.anchorNode;
-    if (e.inputType === "insertText" && n && n.nodeType === 3) {
-      const o = s.anchorOffset, before = n.data.slice(0, o), inCode = !!n.parentElement.closest("pre,code"), sp = ch => ch === undefined || /[\s\u00a0]/.test(ch);
-      if (e.data === " " && blockAuto()) { closePicker(); return; }
-      if (!inCode && inlineAuto(e.data)) return;
-      if (!inCode && before.endsWith("//") && sp(before[o - 3])) { closePicker(); n.deleteData(o - 2, 2); caretTo(n, o - 2); saveSel(); const t = newChip(dateChip()); if (t) openDatePop(t, false); return; }
-      if (before.endsWith("[[")) { n.deleteData(o - 2, 2); openPicker(""); }
-      else if (!inCode && before.endsWith("/") && sp(before[o - 2])) openSlash(n, o, "slash");
-      else if (!inCode && before.endsWith(":") && sp(before[o - 2])) openSlash(n, o, "emoji");
-    } else if (e.inputType === "insertText" && n && n.nodeType === 1 && e.data === " ") blockAuto();
-    if (pickState) updatePicker();
-  });
+  ed.addEventListener("input", e => richInput(e, true));
+;
   ed.addEventListener("click", e => {
     const fb = e.target.closest("div.flow,div.gantt"); if (fb && ed.contains(fb)) { if (e.target.closest("[data-fopen],[data-gopen]") || !e.target.closest(".fc-bar,.gt-bar-top,[data-gi],.fc-tip")) { fb.classList.contains("flow") ? openFlowEditor(fb) : openGanttEditor(fb); } return; }
     const chip = e.target.closest("time.date,span.status"); if (chip && ed.contains(chip)) { chip.tagName === "TIME" ? openDatePop(chip, true) : openStatusPop(chip); return; }
@@ -2065,10 +2287,11 @@ function wireEditor(id, isNew){
       if (force !== true) { askModal("먼저 수정한 사람이 있어요", `${esc(p.updatedBy.name)}님이 편집하는 동안 이 페이지를 먼저 수정했어요.<br>그대로 저장하면 그 내용 위에 덮어써요. (그 버전은 수정 기록에 남아요)`, "덮어써서 저장", () => doSave(true), true); return; } }
     const btn = $("#edSave"); btn.disabled = true; $("#edstate").textContent = "저장 중…";
     try {
-      const html = ed.innerHTML;
+      const html = ed.innerHTML, oldM = p ? mentionsOf(p.html) : [], newM = mentionsOf(sanitize(html)).filter(x => !oldM.includes(x));
       if (isNew) { const t = Date.now(), m = me(), clean = sanitize(html), sibs = kids(editing.parent);
         await store.savePage(id, { title, html: clean, text: plainOf(clean).slice(0, 20000), links: linksOf(clean), parent: editing.parent, order: sibs.length, createdAt: t, createdBy: m, updatedAt: t, updatedBy: m, version: 1 }); }
       else await savePageContent(id, title, html);
+      if (newM.length) notify("mp", newM, id, "", title);
       localStorage.removeItem(draftKey(id)); stopEdit(); toast(isNew ? "게시했어요" : "업데이트했어요");
       location.hash = "#/p/" + id; route(true);
     } catch (ex) { btn.disabled = false; $("#edstate").textContent = ""; toast(errMsg(ex)); }
@@ -2148,6 +2371,9 @@ function updatePicker(){
   if (st.kind === "page") { const r = (q.trim() ? searchPages(q) : [...pages].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))).filter(p => !editing || p.id !== editing.id).slice(0, 8);
     st.items = r.map(p => ({ label: p.title || "제목 없음", sub: pathOf(p).slice(0, -1).map(x => x.title).join(" / ") || SPACE, id: p.id }));
     box.innerHTML = `<div class="ph">${st.mode === "include" ? "불러올 페이지" : "페이지 링크"}${q ? ` · ‘${esc(q)}’` : ""}</div>` + (st.items.length ? st.items.map((it, i) => `<button type="button" data-k="${i}" class="${i === st.sel ? "on" : ""}">${esc(it.label)}<small>${esc(it.sub)}</small></button>`).join("") : `<div class="ph" style="font-weight:400">맞는 페이지가 없어요</div>`); }
+  else if (st.kind === "mention") { const ql = q.toLowerCase(); st.items = people().filter(p => !ql || p.name.toLowerCase().includes(ql) || p.email.startsWith(ql)).slice(0, 8).map(p => ({ label: p.name, sub: p.email, k: p }));
+    if (!st.items.length) { closePicker(); return; }
+    box.innerHTML = `<div class="ph">멘션${q ? ` · ‘${esc(q)}’` : ""}</div>` + st.items.map((it, i) => `<button type="button" data-k="${i}" class="${i === st.sel ? "on" : ""}">${esc(it.label)}<small>${esc(it.sub)}</small></button>`).join(""); }
   else if (st.kind === "emoji") { const ql = q.toLowerCase(); st.items = EMOJI.filter(([ch, kw]) => !ql || kw.toLowerCase().split(" ").some(w => w.startsWith(ql))).slice(0, 8).map(([ch, kw]) => ({ label: ch, sub: kw, k: ch }));
     if (!st.items.length) { closePicker(); return; }
     box.innerHTML = `<div class="ph">이모지${q ? ` · ‘${esc(q)}’` : ""}</div>` + st.items.map((it, i) => `<button type="button" data-k="${i}" class="${i === st.sel ? "on" : ""}"><span style="font-size:18px">${it.label}</span><small>${esc(it.sub)}</small></button>`).join(""); }
@@ -2178,6 +2404,7 @@ function choosePick(i){
   }
   const n = st.node; n.deleteData(st.off - 1, q.length + 1); const r = document.createRange(); r.setStart(n, st.off - 1); r.collapse(true); getSelection().removeAllRanges(); getSelection().addRange(r); saveSel(); const kind = st.kind; closePicker();
   if (kind === "emoji") { document.execCommand("insertText", false, it.k); return; }
+  if (kind === "mention") { newChip(mentionHTML(it.k)); return; }
   insertKind(it.k);
 }
 function insertKind(k){
@@ -2254,7 +2481,7 @@ function wireChrome(){
   $("#meBtn").onclick = e => showMenu([{ head: user ? (user.displayName ? user.displayName + " · " : "") + (user.email || "") : "이 브라우저에만 저장 중" },
     ...(user ? [{ label: "로그아웃", run: () => auth.signOut() }] : [])], e.currentTarget);
   wireTree(); wireSearch(); wireKeys();
-  $("#keysBtn").onclick = showKeys;
+  $("#keysBtn").onclick = showKeys; $("#noteBtn").onclick = e => noteMenu(e.currentTarget);
 }
 function setMode(){
   const m = $("#mode"); m.className = "mode " + (mode === "cloud" ? "" : "local");
@@ -2355,6 +2582,8 @@ async function bootCloud(){
     if (signingUp) return;
     showApp(); main().innerHTML = `<div class="content"><div class="empty">불러오는 중…</div></div>`;
     unsub = fs.collection("wiki_pages").onSnapshot(s => { setPages(s.docs.map(d => ({ id: d.id, ...d.data() }))); const first = !ready; ready = true; renderTree();
+        if (first) { startNotes(); const m = me(); if (m.email) { const pd = fs.collection("wiki_meta").doc("people");
+          pd.get().then(x => { peopleDoc = (x.exists && x.data()) || {}; const k = m.email.toLowerCase(); if (!peopleDoc[k] || peopleDoc[k].name !== m.name) pd.set({ [k]: { name: m.name, at: Date.now() } }, { merge: true }).catch(() => {}); }).catch(() => {}); } }
         if (first || !editing) route(true); else renderTree(); },
       ex => { if (/permission/i.test(ex.code || ex.message)) { if (!signingUp) showPending(u, false); } else toast("불러오지 못했어요. 새로고침해 보세요"); });
     checkAdmin();

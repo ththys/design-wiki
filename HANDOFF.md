@@ -63,7 +63,9 @@
 |---|---|
 | `wiki_pages/{id}` | `title, html(정리된 HTML), text(검색용 글자, 2만 자까지), parent(id\|null), order(숫자), links[](본문 속 [[링크]] 페이지 id), createdAt, createdBy{email,name}, updatedAt, updatedBy{email,name}, version`, trashedAt·trashedBy·trashGroup(휴지통, 없으면 null)` |
 | `wiki_history/{자동}` | `pageId, title, html, version, at, by` — 저장할 때마다 **이전** 내용을 남김 |
-| `wiki_comments/{자동}` | `pageId, text, at, by{email,name}` |
+| `wiki_comments/{자동}` | `pageId, html(서식 댓글, 없으면 옛 댓글이라 text만), text(글자), at, by{email,name}, parent(답글이면 원 댓글 id), editedAt, re{"👍":[{e,n}]}(반응)` |
+| `wiki_notes/{자동}` | 알림: `to(소문자 이메일), from{email,name}, kind(mc 댓글 멘션·mp 페이지 멘션·rp 답글·cm 내 페이지에 댓글), pageId, cid, title, text, at, read`. 읽은 지 30일 지나면 받는 사람 화면이 지움 |
+| `wiki_meta/people` | `{소문자 이메일: {name, at}}` — 로그인할 때 자기 이름을 올림. @멘션 사람 목록 |
 | `wiki_members/{email}` | `name, at, by` (승인된 팀원) |
 | `wiki_requests/{uid}` | `email, name, at, verified(지금은 안 씀), provider` |
 | `wiki_meta/signup` | `day("YYYY-MM-DD"), count` |
@@ -77,6 +79,7 @@
 ### 본문 HTML
 - 저장·보기·붙여 넣기 모두 `sanitize()`를 거침. 허용 태그: `P H1~H6 B I U S SUB SUP MARK A UL OL LI BLOCKQUOTE PRE CODE HR BR TABLE THEAD TBODY TR TH TD FIGURE FIGCAPTION IMG VIDEO DIV` + `TIME.date`, `SPAN.status`. 글 속 `\u200b`(커서 빼기용)는 저장할 때 지움.
 - 특별한 모양: 패널 `div.panel.(info|note|warn|ok|err)`, 할 일 `ul.check > li(.done)`, 페이지 링크 `a.plink[data-page=id]`, 그림 크기 `figure.w-s|w-m`. 이미지·영상 주소는 `https://` 또는 `data:image/`만.
+- **댓글**: `richBox()` = 서식 댓글 상자(페이지 편집기와 같은 빠른 입력 `richInput()`, 위쪽 작은 도구 막대). 포커스하면 전역 `ed`를 그 상자로 바꿔서 공용 함수(날짜·멘션·선택기)를 그대로 씀(페이지 편집 중이 아닐 때만). 답글 한 단계, 편집(본인), 반응 6개, 할 일 체크는 보기에서 바로 저장, 댓글 링크. @멘션 = `span.mention[data-email]`, 사람 목록은 `people()`. 상단 🔔 = `wiki_notes` 실시간 구독.
 - **차트 블록** (본문에 JSON을 속성으로 저장, 보기 때 그림):
   - 플로우차트 `div.flow[data-flow]` = `{dir:"h"|"v", title, lanes[], nodes:[{id,t,s(모양 proc|start|dec|io|sub|doc|note),sub,d,note,tags[],c(색),lp(페이지id)|lu(주소),col(단계 1~),ord}], edges:[{a,b,l(글자),st:"dash",c}]}`. `cleanFlow()`로 정리, `layoutFlow()`가 자동 배치(가장 긴 경로로 단계, 무게중심으로 줄 순서, 뒤로 가는 선은 DFS로 찾아 아래/오른쪽으로 돌려 그림), `mountFlow()`가 그림(보기: 마우스 오버 설명·눌러서 고정·경로 강조·설명 모두 보기·확대·크게 보기 / 편집: 점 끌어 연결). 편집기 `openFlowEditor()`(Tab 다음 상자, 글로 한꺼번에 넣기 `A -> B : 글자`, `-.->` 점선, `{판단}`, `(시작)`).
   - 간트 `div.gantt[data-gantt]` = `{title, items:[{id,g(구분),n,s,e(YYYY-MM-DD),o(담당),p(진행%),c,ms(마일스톤),note,lp|lu}]}`. `mountGantt()`, 편집기 `openGanttEditor()`(표 입력, 엑셀 붙여 넣기: 구분·이름·시작·끝·담당).
@@ -89,6 +92,7 @@
 |---|---|---|
 | `#/` | 개요: 소개·통계·최근 수정 10개·최상위 페이지 | 홈, 개요 |
 | `#/p/<id>` | 페이지 보기: 경로·제목·작성자·본문·하위 페이지·"이 페이지를 링크한 곳"·댓글 | 페이지 |
+| `#/p/<id>/c/<댓글id>` | 페이지 보기 + 그 댓글로 이동·반짝 (댓글 링크·알림에서) | 댓글 링크 |
 | `#/p/<id>/edit` | 편집 (위쪽 도구 막대, 제목 칸, 본문) | 편집, 글쓰기 |
 | `#/new` / `#/new/<부모id>` | 새 페이지 (부모 아래). 상단 **+ 만들기**는 페이지를 열어 둔 상태면 그 페이지의 **하위**로 만듦 | 만들기 |
 | `#/recent` | 최근 수정 100개 | 최근 수정 |
