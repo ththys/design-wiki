@@ -300,6 +300,7 @@ body.rzing{cursor:col-resize;user-select:none} body.rzing *{cursor:col-resize!im
 .tblbar button{border:0;background:none;font-size:12px;padding:4px 8px;border-radius:3px;cursor:pointer;color:var(--ink)}
 .tblbar button:hover{background:var(--hover)} .tblbar .danger{color:var(--danger)}
 .pick{position:absolute;z-index:40;width:320px;background:var(--panel);border-radius:6px;box-shadow:var(--shadow);padding:6px 0;max-height:300px;overflow:auto}
+.pick .pnone{padding:8px 12px;color:var(--muted);font-size:13px}
 .pick .ph{padding:6px 12px;font-size:11px;font-weight:700;color:var(--muted)}
 .pick button{display:flex;flex-direction:column;align-items:flex-start;width:100%;border:0;background:none;padding:7px 12px;cursor:pointer;text-align:left}
 .pick button.on,.pick button:hover{background:var(--sel)}
@@ -601,7 +602,7 @@ const byId = id => pages.find(p => p.id === id);
 const kids = pid => pages.filter(p => (p.parent || null) === (pid || null)).sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || (a.createdAt || 0) - (b.createdAt || 0));
 const pathOf = p => { const out = []; let c = p, g = 0; while (c && g++ < 50) { out.unshift(c); c = c.parent ? byId(c.parent) : null; } return out; };
 const isDesc = (id, anc) => { let c = byId(id), g = 0; while (c && g++ < 50) { if (c.parent === anc) return true; c = c.parent ? byId(c.parent) : null; } return false; };
-const errMsg = ex => /permission|insufficient/i.test(String(ex && (ex.code || ex.message))) ? "권한이 없어요. 관리자에게 위키 권한(이메일 등록)을 요청하세요" : "저장하지 못했어요. 인터넷 연결을 확인해 주세요";
+const errMsg = ex => ex && ex.code === "rules" ? "댓글 편집·체크·반응은 Firebase 규칙을 새로 게시해야 저장돼요 (관리자가 콘솔에서 게시)" : /permission|insufficient/i.test(String(ex && (ex.code || ex.message))) ? "권한이 없어요. 관리자에게 위키 권한(이메일 등록)을 요청하세요" : "저장하지 못했어요. 인터넷 연결을 확인해 주세요";
 
 /* ───────── 저장소 (클라우드/로컬 같은 모양) ───────── */
 const local = {
@@ -640,7 +641,7 @@ const store = {
     const d = local.read(), id = uid(); d.comments.push({ id, ...c }); local.write(d); return id;
   },
   async updateComment(id, data){
-    if (mode === "cloud") return fs.collection("wiki_comments").doc(id).update(data);
+    if (mode === "cloud") return fs.collection("wiki_comments").doc(id).update(data).catch(ex => { if (/permission|insufficient/i.test(String(ex && (ex.code || ex.message)))) { const e = new Error("rules"); e.code = "rules"; throw e; } throw ex; });
     const d = local.read(), i = d.comments.findIndex(c => c.id === id); if (i >= 0) d.comments[i] = { ...d.comments[i], ...data }; local.write(d);
   },
   async deleteRelated(pageIds){ /* 영구 삭제한 페이지의 수정 기록·댓글 정리 */
@@ -2403,21 +2404,32 @@ function pickQuery(){
   if (st.kind === "page") { const a = st.anchor; if (!a.isConnected) return null; const s = getSelection(); if (!s.rangeCount) return ""; const r = document.createRange(); r.setStartAfter(a); try { r.setEnd(s.anchorNode, s.anchorOffset); } catch { return null; } return r.toString(); }
   const s = getSelection(); if (!s.rangeCount || s.anchorNode !== st.node) return null; if (s.anchorOffset < st.off) return null; return st.node.data.slice(st.off, s.anchorOffset);
 }
+/* 한글 검색: 자모로 풀어서 비교 (입력 중인 'ㅇ', '이여' 도 '이영호'에 맞음) + 초성 검색 ('ㅇㅇㅎ') */
+const CHO = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ", JUNG = ["ㅏ","ㅐ","ㅑ","ㅒ","ㅓ","ㅔ","ㅕ","ㅖ","ㅗ","ㅗㅏ","ㅗㅐ","ㅗㅣ","ㅛ","ㅜ","ㅜㅓ","ㅜㅔ","ㅜㅣ","ㅠ","ㅡ","ㅡㅣ","ㅣ"],
+  JONG = ["","ㄱ","ㄲ","ㄱㅅ","ㄴ","ㄴㅈ","ㄴㅎ","ㄷ","ㄹ","ㄹㄱ","ㄹㅁ","ㄹㅂ","ㄹㅅ","ㄹㅌ","ㄹㅍ","ㄹㅎ","ㅁ","ㅂ","ㅂㅅ","ㅅ","ㅆ","ㅇ","ㅈ","ㅊ","ㅋ","ㅌ","ㅍ","ㅎ"],
+  CJ = { "ㄳ": "ㄱㅅ", "ㄵ": "ㄴㅈ", "ㄶ": "ㄴㅎ", "ㄺ": "ㄹㄱ", "ㄻ": "ㄹㅁ", "ㄼ": "ㄹㅂ", "ㄽ": "ㄹㅅ", "ㄾ": "ㄹㅌ", "ㄿ": "ㄹㅍ", "ㅀ": "ㄹㅎ", "ㅄ": "ㅂㅅ", "ㅘ": "ㅗㅏ", "ㅙ": "ㅗㅐ", "ㅚ": "ㅗㅣ", "ㅝ": "ㅜㅓ", "ㅞ": "ㅜㅔ", "ㅟ": "ㅜㅣ", "ㅢ": "ㅡㅣ" };
+const jamo = s => [...String(s || "").toLowerCase()].map(c => { const k = c.charCodeAt(0) - 0xAC00; if (k < 0 || k > 11171) return CJ[c] || c;
+  return CHO[Math.floor(k / 588)] + JUNG[Math.floor(k % 588 / 28)] + JONG[k % 28]; }).join("").replace(/\s+/g, "");
+const choOf = s => [...String(s || "")].map(c => { const k = c.charCodeAt(0) - 0xAC00; return k >= 0 && k <= 11171 ? CHO[Math.floor(k / 588)] : c.toLowerCase(); }).join("").replace(/\s+/g, "");
+function koMatch(hay, q){ if (!q) return true; const h = String(hay || "").toLowerCase(), ql = q.toLowerCase().trim(); if (!ql) return true; if (h.includes(ql)) return true;
+  if (jamo(h).includes(jamo(ql))) return true; return /^[ㄱ-ㅎ]+$/.test(ql) && choOf(h).includes(ql); }
+let imeOn = false; document.addEventListener("compositionstart", () => imeOn = true, true); document.addEventListener("compositionend", () => { imeOn = false; setTimeout(() => { if (pickState) updatePicker(); }, 0); }, true);
+const noneHTML = q => `<div class="pnone">‘${esc(q)}’에 맞는 게 없어요</div>`;
 function updatePicker(){
   const st = pickState, box = $("#pick"); if (!st || !box) return;
   const q = pickQuery(); if (q === null || /\n/.test(q) || q.length > 60 || (st.kind !== "page" && /\s/.test(q))) { closePicker(); return; }
-  if (st.kind === "page") { const r = (q.trim() ? searchPages(q) : [...pages].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))).filter(p => !editing || p.id !== editing.id).slice(0, 8);
+  if (st.kind === "page") { const sr = q.trim() ? searchPages(q) : null, r = (q.trim() ? (sr.length ? sr : pages.filter(p => koMatch(p.title, q))) : [...pages].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))).filter(p => !editing || p.id !== editing.id).slice(0, 8);
     st.items = r.map(p => ({ label: p.title || "제목 없음", sub: pathOf(p).slice(0, -1).map(x => x.title).join(" / ") || SPACE, id: p.id }));
     box.innerHTML = `<div class="ph">${st.mode === "include" ? "불러올 페이지" : "페이지 링크"}${q ? ` · ‘${esc(q)}’` : ""}</div>` + (st.items.length ? st.items.map((it, i) => `<button type="button" data-k="${i}" class="${i === st.sel ? "on" : ""}">${esc(it.label)}<small>${esc(it.sub)}</small></button>`).join("") : `<div class="ph" style="font-weight:400">맞는 페이지가 없어요</div>`); }
-  else if (st.kind === "mention") { const ql = q.toLowerCase(); st.items = people().filter(p => !ql || p.name.toLowerCase().includes(ql) || p.email.startsWith(ql)).slice(0, 8).map(p => ({ label: p.name, sub: p.email, k: p }));
-    if (!st.items.length) { closePicker(); return; }
-    box.innerHTML = `<div class="ph">멘션${q ? ` · ‘${esc(q)}’` : ""}</div>` + st.items.map((it, i) => `<button type="button" data-k="${i}" class="${i === st.sel ? "on" : ""}">${esc(it.label)}<small>${esc(it.sub)}</small></button>`).join(""); }
-  else if (st.kind === "emoji") { const ql = q.toLowerCase(); st.items = EMOJI.filter(([ch, kw]) => !ql || kw.toLowerCase().split(" ").some(w => w.startsWith(ql))).slice(0, 8).map(([ch, kw]) => ({ label: ch, sub: kw, k: ch }));
-    if (!st.items.length) { closePicker(); return; }
-    box.innerHTML = `<div class="ph">이모지${q ? ` · ‘${esc(q)}’` : ""}</div>` + st.items.map((it, i) => `<button type="button" data-k="${i}" class="${i === st.sel ? "on" : ""}"><span style="font-size:18px">${it.label}</span><small>${esc(it.sub)}</small></button>`).join(""); }
-  else { const ql = q.toLowerCase(); st.items = SLASH.filter(([l, k, al]) => !q || l.includes(q) || k.includes(ql) || al.split(" ").some(w => w.startsWith(ql))).map(([l, k, al]) => ({ label: l, k, al: al.split(" ")[0] }));
-    if (!st.items.length) { closePicker(); return; }
-    box.innerHTML = `<div class="ph">넣기</div>` + st.items.map((it, i) => `<button type="button" data-k="${i}" class="${i === st.sel ? "on" : ""}">${esc(it.label)}<small>/${esc(it.al)}</small></button>`).join(""); }
+  else if (st.kind === "mention") { const ql = q.toLowerCase(); st.items = people().filter(p => koMatch(p.name, q) || p.email.startsWith(ql)).slice(0, 8).map(p => ({ label: p.name, sub: p.email, k: p }));
+    if (!st.items.length && !imeOn && q.length > 1) { closePicker(); return; }
+    box.innerHTML = `<div class="ph">멘션${q ? ` · ‘${esc(q)}’` : ""}</div>` + (st.items.length ? "" : noneHTML(q)) + st.items.map((it, i) => `<button type="button" data-k="${i}" class="${i === st.sel ? "on" : ""}">${esc(it.label)}<small>${esc(it.sub)}</small></button>`).join(""); }
+  else if (st.kind === "emoji") { const ql = q.toLowerCase(); st.items = EMOJI.filter(([ch, kw]) => !ql || kw.toLowerCase().split(" ").some(w => w.startsWith(ql) || (/[ㄱ-ㅎ가-힣]/.test(ql) && jamo(w).startsWith(jamo(ql))))).slice(0, 8).map(([ch, kw]) => ({ label: ch, sub: kw, k: ch }));
+    if (!st.items.length && !imeOn) { closePicker(); return; }
+    box.innerHTML = `<div class="ph">이모지${q ? ` · ‘${esc(q)}’` : ""}</div>` + (st.items.length ? "" : noneHTML(q)) + st.items.map((it, i) => `<button type="button" data-k="${i}" class="${i === st.sel ? "on" : ""}"><span style="font-size:18px">${it.label}</span><small>${esc(it.sub)}</small></button>`).join(""); }
+  else { const ql = q.toLowerCase(); st.items = SLASH.filter(([l, k, al]) => !q || koMatch(l, q) || k.includes(ql) || al.split(" ").some(w => w.startsWith(ql) || (/[ㄱ-ㅎ가-힣]/.test(ql) && jamo(w).startsWith(jamo(ql))))).map(([l, k, al]) => ({ label: l, k, al: al.split(" ")[0] }));
+    if (!st.items.length && !imeOn) { closePicker(); return; }
+    box.innerHTML = `<div class="ph">넣기</div>` + (st.items.length ? "" : noneHTML(q)) + st.items.map((it, i) => `<button type="button" data-k="${i}" class="${i === st.sel ? "on" : ""}">${esc(it.label)}<small>/${esc(it.al)}</small></button>`).join(""); }
   st.sel = Math.min(st.sel, Math.max(0, st.items.length - 1));
   const rc = caretRect(); if (rc) { box.style.left = Math.min(rc.left, innerWidth - 330) + "px"; box.style.top = (rc.bottom + 6 + scrollY) + "px"; box.style.position = "absolute"; }
   box.onmousedown = e => e.preventDefault();

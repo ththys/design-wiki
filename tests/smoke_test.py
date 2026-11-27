@@ -338,6 +338,23 @@ with sync_playwright() as p:
     pg.click("#ed"); pg.keyboard.press("Control+s"); pg.wait_for_timeout(400)
     page_late = pg.locator("#pDoc ul.check li", has_text="보스 패턴 정리").locator("time.date.late").count() == 1
     check("줄 중간 [] → 할 일(멘션 유지) · 할 일 날짜 오늘=노랑·지남=빨강·끝냄=회색 (댓글·글)", mid and today and late_ed and late_v and done_v and page_late, f"{mid},{today},{late_ed},{late_v},{done_v},{page_late}")
+
+    # 21) 한글 입력 중에도 @멘션·/ 메뉴 검색 (입력기 흉내)
+    pg.evaluate("() => { const d = JSON.parse(localStorage.getItem('wiki-v1')); d.pages.push({id:'pp1',title:'사람',html:'',parent:null,order:130,createdAt:1,updatedAt:1,createdBy:{email:'lee@x.com',name:'이영호'},updatedBy:{email:'lee@x.com',name:'이영호'},version:1}); localStorage.setItem('wiki-v1', JSON.stringify(d)); }")
+    pg.goto(URL + "#/p/cm1"); pg.reload(); pg.wait_for_timeout(300)
+    cdp = pg.context.new_cdp_session(pg); names = lambda: [x.split("\n")[0].strip() for x in pg.locator("#pick button").all_inner_texts()]
+    pg.click("#cIn"); pg.keyboard.type("@"); pg.wait_for_timeout(60); ok_steps = []
+    for comp in ["ㅇ", "이", "이여", "이영"]:
+        cdp.send("Input.imeSetComposition", {"text": comp, "selectionStart": len(comp), "selectionEnd": len(comp)}); pg.wait_for_timeout(60); ok_steps.append(names()[:1] == ["이영호"] or names())
+    cdp.send("Input.insertText", {"text": "이영"}); pg.wait_for_timeout(60); pg.keyboard.press("Enter")
+    picked = pg.locator("#cIn span.mention", has_text="이영호").count() == 1
+    pg.keyboard.type(" @"); cdp.send("Input.insertText", {"text": "ㄱㄱㅎ"}); pg.wait_for_timeout(60); cho = names() == ["김기획"]; pg.keyboard.press("Escape")
+    pg.goto(URL + "#/p/cm1/edit"); pg.wait_for_timeout(300); pg.locator("#ed p").last.click(); pg.keyboard.press("End"); pg.keyboard.press("Enter"); pg.keyboard.type("/")
+    cdp.send("Input.imeSetComposition", {"text": "ㅈ", "selectionStart": 1, "selectionEnd": 1}); pg.wait_for_timeout(60); sl = "접기" in names()
+    cdp.send("Input.imeSetComposition", {"text": "저", "selectionStart": 1, "selectionEnd": 1}); pg.wait_for_timeout(60); sl2 = "접기" in names(); pg.keyboard.press("Escape")
+    pg.click("#edCancel"); pg.wait_for_timeout(100)
+    if pg.locator("#askOk").count(): pg.click("#askOk"); pg.wait_for_timeout(200)
+    check("한글 입력 중 검색: @ㅇ·@이여 → 이영호, @ㄱㄱㅎ(초성) → 김기획, /ㅈ·/저 → 접기", all(x is True for x in ok_steps) and picked and cho and sl and sl2, f"{ok_steps},{picked},{cho},{sl},{sl2}")
     check("자바스크립트 오류 없음", not errs, "; ".join(errs[:3]))
     b.close()
 srv.shutdown()
