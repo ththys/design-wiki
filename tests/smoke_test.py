@@ -214,6 +214,46 @@ with sync_playwright() as p:
     pg.goto(URL + "#/trash"); pg.reload(); pg.wait_for_timeout(400)
     ids = pg.evaluate("JSON.parse(localStorage.getItem('wiki-v1')).pages.map(p=>p.id)")
     check("7일 지난 휴지통 자동 삭제 (2일 된 건 남음)", "old1" not in ids and "new1" in ids and "5일 뒤 삭제" in pg.inner_text("#main"), str(ids))
+
+    # 16) 플로우차트·간트·만들기(하위로)
+    pg.goto(URL + "#/"); pg.wait_for_timeout(150); pg.click("#createBtn"); pg.wait_for_timeout(200)
+    pg.fill("#edTitle", "전투 흐름"); pg.click("#ed"); pg.keyboard.type("/flowchart"); pg.wait_for_timeout(100); pg.keyboard.press("Enter"); pg.wait_for_timeout(300)
+    opened = pg.locator("#feCanvas .fc-node").count() == 2   # 시작 + 새 상자
+    pg.locator('#feSide [data-f="t"]').fill("공격"); pg.keyboard.press("Tab"); pg.wait_for_timeout(100); pg.locator('#feSide [data-f="t"]').fill("피격")
+    pg.locator('#feSide [data-f="note"]').fill("맞으면 경직"); pg.wait_for_timeout(50)
+    three = pg.locator("#feCanvas .fc-node").count() == 3
+    # 점 끌어서: 피격 → 시작 (뒤로 가는 선)
+    pid_n = pg.evaluate("[...document.querySelectorAll('#feCanvas .fc-node')].find(n=>n.textContent.includes('피격')).dataset.id")
+    sid_n = pg.evaluate("[...document.querySelectorAll('#feCanvas .fc-node')].find(n=>n.textContent.includes('시작')).dataset.id")
+    pg.locator(f'#feCanvas .fc-node[data-id="{pid_n}"]').hover(); port = pg.locator(f'#feCanvas .fc-node[data-id="{pid_n}"] .fc-port').bounding_box(); tgt = pg.locator(f'#feCanvas .fc-node[data-id="{sid_n}"]').bounding_box()
+    pg.mouse.move(port["x"] + 6, port["y"] + 6); pg.mouse.down(); pg.mouse.move(tgt["x"] + 40, tgt["y"] + 20, steps=8); pg.mouse.up(); pg.wait_for_timeout(150)
+    back_edge = pg.locator("#feCanvas .fc-e.back").count() == 1
+    # 글로 한꺼번에
+    pg.click('[data-fe="text"]'); ta = pg.locator(".fe-text textarea"); ta.fill(ta.input_value() + "\n공격 -> {가드 중?}\n{가드 중?} -> 패링 : 예\n{가드 중?} -.-> 피격 : 아니오")
+    pg.click('.fe-text [data-t="ok"]'); pg.wait_for_timeout(200)
+    txt_ok = pg.locator("#feCanvas .fc-node.sh-dec").count() == 1 and pg.locator("#feCanvas .fc-node").count() == 5 and pg.locator("#feCanvas .fc-e.dash").count() == 1 and pg.locator("#feCanvas .fc-el", has_text="예").count() == 1
+    note_kept = pg.evaluate("[...document.querySelectorAll('#feCanvas .fc-node')].some(n=>n.textContent.includes('피격') && n.textContent.includes('ⓘ'))")
+    pg.click('[data-fe="dir"]'); pg.wait_for_timeout(100); vert = pg.locator('#feCanvas .fc-stage[data-dir="v"]').count() == 1
+    pg.keyboard.press("Escape"); pg.wait_for_timeout(50); still = pg.locator("#feCanvas").count() == 1 and pg.locator('.fe-text [data-t="x"]').count() == 1   # Esc → 버릴지 묻기
+    pg.click('.fe-text [data-t="x"]')
+    pg.click('[data-fe="ok"]'); pg.wait_for_timeout(200)
+    check("플로우차트 편집: Tab 이어 만들기·점 끌어 연결·뒤로 가는 선·글로 넣기·세로", opened and three and back_edge and txt_ok and note_kept and vert and still, f"{opened},{three},{back_edge},{txt_ok},{note_kept},{vert},{still}")
+    pg.locator("#ed > p").last.click(); pg.keyboard.type("/gantt"); pg.wait_for_timeout(100); pg.keyboard.press("Enter"); pg.wait_for_timeout(300)
+    rows0 = pg.locator("#geRows tr").count(); pg.click('[data-ge="add"]'); pg.keyboard.type("테스트 일정"); pg.wait_for_timeout(100)
+    g_ok = rows0 == 3 and pg.locator("#gePrev .gt-bar", has_text="테스트 일정").count() == 1
+    pg.click('[data-ge="ok"]'); pg.wait_for_timeout(200)
+    pg.keyboard.press("Control+Enter"); pg.wait_for_timeout(400)
+    view_ok = pg.locator("#pDoc .fc-node").count() == 5 and pg.locator("#pDoc .gt-bar").count() >= 3 and pg.locator("#pDoc .gt-ms").count() == 1
+    pg.locator("#pDoc .fc-node", has_text="피격").hover(); pg.wait_for_timeout(100); tip = pg.locator("#pDoc .fc-tip", has_text="맞으면 경직").count() == 1
+    pg.locator("#pDoc .fc-node", has_text="피격").click(); pg.mouse.move(5, 5); pg.wait_for_timeout(100); pinned = pg.locator("#pDoc .fc-tip.pin").count() == 1
+    hi = pg.locator("#pDoc .fc-node.dim").count() >= 1
+    pg.click('#pDoc [data-fb="all"]'); allv = pg.locator("#pDoc .fc-note", has_text="맞으면 경직").count() == 1
+    srch = "가드 중" in pg.evaluate("(JSON.parse(localStorage.getItem('wiki-v1')).pages.find(p=>p.title==='전투 흐름')||{}).text || ''")
+    check("보기: 차트 그리기·마우스 설명·눌러서 켜 두기·경로 강조·설명 모두 보기·검색", g_ok and view_ok and tip and pinned and hi and allv and srch, f"{g_ok},{view_ok},{tip},{pinned},{hi},{allv},{srch}")
+    fid = pg.evaluate("location.hash.split('/')[2]")
+    pg.click("#createBtn"); pg.wait_for_timeout(200); pg.fill("#edTitle", "하위 확인"); pg.click("#ed"); pg.keyboard.type("본문"); pg.keyboard.press("Control+s"); pg.wait_for_timeout(300)
+    par = pg.evaluate("(JSON.parse(localStorage.getItem('wiki-v1')).pages.find(p=>p.title==='하위 확인')||{}).parent")
+    check("페이지 연 상태에서 만들기 → 하위 페이지", par == fid, f"{par},{fid}")
     check("자바스크립트 오류 없음", not errs, "; ".join(errs[:3]))
     b.close()
 srv.shutdown()
