@@ -8,7 +8,7 @@
       ];
     }
     function isWikiTeam() {
-      return isWikiAdmin() || (request.auth != null && request.auth.token.email_verified == true
+      return isWikiAdmin() || (request.auth != null
         && exists(/databases/$(database)/documents/wiki_members/$(request.auth.token.email)));
     }
     match /wiki_pages/{id} {

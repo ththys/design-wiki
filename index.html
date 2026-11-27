@@ -1064,7 +1064,6 @@ function showGate(msg, tab){
       await cr.user.updateProfile({ displayName: name });
       const ok = await sendRequest(cr.user, name);
       if (ok !== true) { gateMsg = [ok === "closed" ? CLOSED_MSG : `오늘 가입 요청이 가득 찼어요 (하루 ${DAY_MAX}명까지). 내일 다시 시도해 주세요.`, "signup"]; signingUp = false; await cr.user.delete().catch(() => auth.signOut()); return; }
-      cr.user.sendEmailVerification().catch(() => {});
       signingUp = false; showPending(cr.user, true);
     } catch (ex) { const c = String(ex.code || ex.message || "");
       const msg = c.includes("email-already-in-use") ? "이미 가입된 이메일이에요. 위 ‘로그인’ 탭에서 로그인하면 요청 상태를 볼 수 있어요"
@@ -1112,13 +1111,10 @@ async function showPending(u, fresh){
   }
   gateCard(`<h1>${fresh ? "가입 요청을 보냈어요" : "승인을 기다리는 중이에요"}</h1>
     <p>관리자가 승인하면 바로 들어올 수 있어요. 승인 뒤 이 화면에서 <b>다시 확인</b>을 눌러 주세요.</p>
-    ${pw ? `<div class="gstep ${u.emailVerified ? "done" : ""}">${u.emailVerified ? "✓ 이메일 인증 완료" : `① 메일함에서 <b>이메일 인증</b> 링크를 눌러 주세요 (${esc(u.email)})`}</div>` : ""}
-    <div class="gstep">${pw ? "②" : "①"} 관리자 승인 대기 중</div>
+    <div class="gstep">⏳ 관리자 승인 대기 중 (${esc(u.email)})</div>
     <button class="btn primary" id="pChk">다시 확인</button><div style="height:8px"></div>
-    ${pw && !u.emailVerified ? `<button class="btn" id="pRe">인증 메일 다시 보내기</button><div style="height:8px"></div>` : ""}
     <button class="btn" id="pOut">로그아웃</button>`);
   $("#pChk").onclick = async () => { try { await u.reload(); await u.getIdToken(true); } catch {} location.reload(); };
-  if ($("#pRe")) $("#pRe").onclick = () => u.sendEmailVerification().then(() => toast("인증 메일을 다시 보냈어요"), () => toast("잠시 뒤에 다시 시도해 주세요"));
   $("#pOut").onclick = () => auth.signOut();
 }
 function showApp(){ $("#gate").hidden = true; $("#app").hidden = false; setMode(); }
@@ -1159,7 +1155,7 @@ function showMembers(){
   <div class="sgate ${signupClosed ? "closed" : ""}"><span class="sdot"></span><span class="pm"><b>${signupClosed ? "가입 신청 막힘" : "가입 신청 받는 중"}</b><small>${signupClosed ? "새 가입 신청을 받지 않아요. 이미 들어온 요청은 승인할 수 있어요." : "누구나 로그인 화면에서 가입 요청을 보낼 수 있어요."}</small></span>
     <button class="btn sm ${signupClosed ? "primary" : "danger"}" id="sgToggle">${signupClosed ? "가입 다시 받기" : "가입 막기"}</button></div>
   <div class="sec"><h3>가입 요청 ${reqs.length}</h3>${reqs.length ? `<div class="plist">${reqs.map(r => `<div class="mrow"><span class="avatar" style="cursor:default">${esc(initials(r.name || r.email))}</span>
-      <span class="pm"><b>${esc(r.name || "(이름 없음)")}</b><small>${esc(r.email)} · ${ago(r.at)} · ${r.provider === "google.com" ? "구글 계정" : r.verified ? "이메일 인증됨" : "이메일 인증 전"}</small></span>
+      <span class="pm"><b>${esc(r.name || "(이름 없음)")}</b><small>${esc(r.email)} · ${ago(r.at)} · ${r.provider === "google.com" ? "구글 계정" : "이메일 가입"}</small></span>
       <button class="btn sm primary" data-ok="${esc(r.uid)}">승인</button><button class="btn sm" data-no="${esc(r.uid)}">거절</button></div>`).join("")}</div>` : `<p style="color:var(--muted)">새 요청이 없어요.</p>`}</div>
   <div class="sec"><h3>팀원 ${members.length}</h3>${members.length ? `<div class="plist">${members.map(m => `<div class="mrow"><span class="avatar" style="cursor:default">${esc(initials(m.name || m.email))}</span>
       <span class="pm"><b>${esc(m.name || m.email)}</b><small>${esc(m.email)} · ${ago(m.at)} 승인</small></span><button class="btn sm" data-rm="${esc(m.email)}">내보내기</button></div>`).join("")}</div>` : `<p style="color:var(--muted)">승인한 팀원이 아직 없어요. (규칙에 직접 적은 관리자는 여기 안 보여요)</p>`}</div></div>`;
@@ -1170,11 +1166,7 @@ function showMembers(){
     try { const bt = fs.batch(); bt.set(fs.collection("wiki_members").doc(r.email.toLowerCase()), { name: r.name || "", at: Date.now(), by: me().email }); bt.delete(fs.collection("wiki_requests").doc(r.uid)); await bt.commit(); toast(`${r.name || r.email}님을 승인했어요`); }
     catch (ex) { if (b) { b.disabled = false; b.textContent = "승인"; } toast("승인하지 못했어요: " + (/permission/i.test(ex.code || "") ? "규칙에서 관리자 권한을 확인해 주세요" : (ex.code || ex.message || ""))); } };
   main().querySelectorAll("[data-ok]").forEach(b => b.onclick = () => { const r = reqs.find(x => x.uid === b.dataset.ok); if (!r) return;
-    if (r.provider === "google.com" || r.verified) return approve(r, b);
-    modal(`<header><h2>승인할까요?</h2></header><div class="mb"><p><b>${esc(r.name || r.email)}</b> (${esc(r.email)})님은 아직 <b>이메일 인증 전</b>이에요.</p>
-      <p style="color:var(--muted);font-size:13px">지금 승인해 둬도 돼요. 본인이 메일함(스팸함 포함)에서 인증 링크를 누르면 그때부터 들어올 수 있어요.</p></div>
-      <footer><button class="btn subtle" data-close>취소</button><button class="btn primary" id="okYes">승인</button></footer>`);
-    $("#okYes").onclick = () => { closeModal(); approve(r, b); }; });
+    approve(r, b); });
   main().querySelectorAll("[data-no]").forEach(b => b.onclick = () => { const r = reqs.find(x => x.uid === b.dataset.no); if (!r) return;
     modal(`<header><h2>거절할까요?</h2></header><div class="mb"><p>${esc(r.email)}의 가입 요청을 지워요.</p></div><footer><button class="btn subtle" data-close>취소</button><button class="btn danger" id="noYes">거절</button></footer>`);
     $("#noYes").onclick = async () => { closeModal(); try { await fs.collection("wiki_requests").doc(r.uid).delete(); toast("거절했어요"); } catch (ex) { toast(errMsg(ex)); } }; });
