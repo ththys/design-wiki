@@ -61,7 +61,7 @@
 ### Firestore 데이터 (모두 `monster-ref` 프로젝트)
 | 위치 | 필드 |
 |---|---|
-| `wiki_pages/{id}` | `title, html(정리된 HTML), text(검색용 글자, 2만 자까지), parent(id\|null), order(숫자), links[](본문 속 [[링크]] 페이지 id), createdAt, createdBy{email,name}, updatedAt, updatedBy{email,name}, version` |
+| `wiki_pages/{id}` | `title, html(정리된 HTML), text(검색용 글자, 2만 자까지), parent(id\|null), order(숫자), links[](본문 속 [[링크]] 페이지 id), createdAt, createdBy{email,name}, updatedAt, updatedBy{email,name}, version`, trashedAt·trashedBy·trashGroup(휴지통, 없으면 null)` |
 | `wiki_history/{자동}` | `pageId, title, html, version, at, by` — 저장할 때마다 **이전** 내용을 남김 |
 | `wiki_comments/{자동}` | `pageId, text, at, by{email,name}` |
 | `wiki_members/{email}` | `name, at, by` (승인된 팀원) |
@@ -89,6 +89,7 @@
 | `#/new` / `#/new/<부모id>` | 새 페이지 (부모 아래) | 만들기 |
 | `#/recent` | 최근 수정 100개 | 최근 수정 |
 | `#/search/<검색어>` | 검색 결과 | 검색 |
+| `#/trash` | 휴지통: 지운 페이지(하위 포함 묶음) 보기·되살리기·영구 삭제. 7일 지나면 누가 위키를 열 때 `purgeOld()`가 영구 삭제 | 휴지통 |
 | `#/members` | 팀원 관리 (관리자만): 가입 막기 토글, 가입 요청 승인/거절, 팀원 내보내기 | 팀원 관리 |
 
 - 왼쪽 **페이지 트리**: 펼치기/접기, 끌어 놓기(상자 가운데=그 아래로, 위·아래 가장자리=앞뒤 순서, 빈 곳=최상위, 자기 하위로는 막힘, 알림에서 되돌리기), 우클릭·⋯ 메뉴(열기·편집·하위 만들기·복제·링크 복사·위로·아래로·최상위로·삭제).
@@ -151,7 +152,8 @@
 - [ ] 회사망에서 이메일 로그인
 
 **알려진 한계·정리하면 좋은 것**
-- [ ] 페이지를 지워도 그 페이지의 `wiki_history`·`wiki_comments`는 남음(고아 문서)
+- [ ] 페이지를 영구 삭제해도 그 페이지의 `wiki_history`·`wiki_comments`는 남음(고아 문서). 지우려면 규칙에 history·comments delete 권한을 더해야 해서 보류
+- 삭제는 휴지통 방식: `pages`=휴지통 아닌 것만, `allPages`=전부. 화면 코드는 `pages`만 쓰면 됨
 - [ ] 페이지 본문을 전부 실시간으로 받음 → 페이지가 수백 개·본문이 크면 느려질 수 있음
 - [ ] 수정 기록이 끝없이 쌓임(개수 제한 없음)
 - [ ] `wiki_meta/signup` 숫자는 로그인한 누구나 올릴 수 있어, 장난으로 그날 가입을 막을 수 있음

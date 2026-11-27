@@ -307,6 +307,11 @@ input:focus,textarea:focus,select:focus{border-color:var(--brand)}
 .gstep.done{background:var(--ok);color:var(--ink)}
 .nbadge{margin-left:auto;background:var(--danger);color:#fff;border-radius:10px;font-size:11px;font-weight:700;padding:0 6px;line-height:18px}
 .nbadge:empty{display:none}
+.tcount{margin-left:auto;color:var(--muted);font-size:12px;font-weight:500}
+.trow2{display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--line2)}
+.trow2:last-child{border-bottom:0}
+.trow2 .pm{flex:1;min-width:0} .trow2 .pm b{display:block;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap} .trow2 .pm small{color:var(--muted);font-size:12px}
+.trow2 .left{font-size:12px;color:var(--danger);white-space:nowrap}
 .mrow{display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--line2)}
 .mrow:last-child{border-bottom:0}
 .mrow .pm{flex:1;min-width:0} .mrow .pm b{display:block;font-weight:500} .mrow .pm small{color:var(--muted);font-size:12px}
@@ -351,6 +356,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--brand)}
       <a href="#/" data-nav="home"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11 12 3l9 8v10H3z"/></svg>개요</a>
       <a href="#/members" data-nav="members" id="navMembers" hidden><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14.8c1.9.8 3.1 2.6 3.5 5.2"/></svg>팀원 관리<span class="nbadge" id="nReq"></span></a>
       <a href="#/recent" data-nav="recent"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>최근 수정</a>
+      <a href="#/trash" data-nav="trash"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>휴지통<span class="tcount" id="nTrash"></span></a>
     </nav>
     <div class="shead"><span>페이지</span><button class="ibtn" id="addRoot" type="button" title="최상위 페이지 만들기" style="width:24px;height:24px">+</button></div>
     <div class="tree" id="tree"></div>
@@ -371,7 +377,11 @@ const SPACE = CFG.spaceName || "디자인 위키";
 const LS = "wiki-v1";
 const FORCE_LOCAL = /[?&]local\b/.test(location.search);
 let mode = "local", fs = null, auth = null, user = null;
-let pages = [];                 // {id,title,html,text,parent,order,links,createdAt,createdBy,updatedAt,updatedBy,version}
+let allPages = [];              // 휴지통 포함 전부
+let pages = [];                 // 휴지통에 없는 페이지만 (화면은 전부 이걸 씀)
+const TRASH_DAYS = 7;
+function setPages(list){ allPages = list; pages = list.filter(p => !p.trashedAt); paintTrash(); purgeOld(); }
+// {id,title,html,text,parent,order,links,createdAt,createdBy,updatedAt,updatedBy,version}
 let unsub = null, ready = false;
 let open = new Set(JSON.parse(localStorage.getItem("wiki-open") || "[]"));
 let editing = null;             // {id, startedAt, isNew}
@@ -436,7 +446,7 @@ const store = {
     const d = local.read(); d.comments = d.comments.filter(c => c.id !== id); local.write(d);
   },
 };
-function loadLocal(){ pages = local.read().pages; ready = true; renderTree(); route(true); }
+function loadLocal(){ setPages(local.read().pages); ready = true; renderTree(); route(true); }
 
 /* ───────── HTML 정리 (붙여 넣기·저장·보기 공통) ───────── */
 const KEEP = new Set(["P","H1","H2","H3","H4","H5","H6","SUB","SUP","MARK","B","I","U","S","A","UL","OL","LI","BLOCKQUOTE","PRE","CODE","HR","BR","TABLE","THEAD","TBODY","TR","TH","TD","FIGURE","FIGCAPTION","IMG","VIDEO","DIV"]);
@@ -793,6 +803,7 @@ function parseHash(){ const h = decodeURIComponent(location.hash.replace(/^#\/?/
   if (a === "p" && b) return { v: c === "edit" ? "edit" : "page", id: b };
   if (a === "new") return { v: "new", parent: b || null };
   if (a === "recent") return { v: "recent" };
+  if (a === "trash") return { v: "trash" };
   if (a === "members") return { v: "members" };
   if (a === "search") return { v: "search", q: b || "" };
   return { v: "home" }; }
@@ -809,6 +820,7 @@ function route(force){
   if (r.v === "edit") return showEditor(r.id);
   if (r.v === "new") return newPage(r.parent);
   if (r.v === "recent") return showRecent();
+  if (r.v === "trash") return showTrash();
   if (r.v === "members") return showMembers();
   if (r.v === "search") return showSearch(r.q);
   return showHome();
@@ -930,13 +942,52 @@ async function duplicatePage(id){
     location.hash = "#/p/" + nid + "/edit";
   } catch (ex) { toast(errMsg(ex)); }
 }
-function deletePage(id){
+function deletePage(id){ /* 휴지통으로 옮기기 (7일 뒤 영구 삭제) */
   const p = byId(id); if (!p) return;
   const all = [id, ...pages.filter(x => isDesc(x.id, id)).map(x => x.id)];
-  modal(`<header><h2>페이지 삭제</h2></header><div class="mb"><p>‘${esc(p.title || "제목 없음")}’${all.length > 1 ? `과 하위 페이지 ${all.length - 1}개` : ""}를 삭제할까요?</p>
-    <p style="color:var(--muted);font-size:13px">수정 기록은 남아 있지만, 페이지는 되살릴 수 없어요.</p></div>
-    <footer><button class="btn subtle" data-close>취소</button><button class="btn danger" id="delYes">삭제</button></footer>`);
-  $("#delYes").onclick = async () => { closeModal(); try { await store.deletePages(all); toast("삭제했어요"); if (all.includes(parseHash().id)) location.hash = p.parent ? "#/p/" + p.parent : "#/"; } catch (ex) { toast(errMsg(ex)); } };
+  askModal("휴지통으로 옮기기", `‘${esc(p.title || "제목 없음")}’${all.length > 1 ? `과 하위 페이지 ${all.length - 1}개` : ""}를 휴지통으로 옮길까요?<br><span style="color:var(--muted);font-size:13px">휴지통에서 ${TRASH_DAYS}일 안에 되살릴 수 있어요. ${TRASH_DAYS}일이 지나면 자동으로 영구 삭제돼요.</span>`, "휴지통으로", async () => {
+    const t = Date.now(), m = me();
+    try { await store.batchPages(all.map(x => ({ id: x, data: { trashedAt: t, trashedBy: m, trashGroup: id } })));
+      toast("휴지통으로 옮겼어요", "되돌리기", () => restoreTrash(id));
+      if (all.includes(parseHash().id)) location.hash = p.parent && byId(p.parent) ? "#/p/" + p.parent : "#/";
+    } catch (ex) { toast(errMsg(ex)); } }, true);
+}
+const trashGroups = () => { const g = {}; allPages.filter(p => p.trashedAt).forEach(p => { const k = p.trashGroup || p.id; (g[k] = g[k] || []).push(p); });
+  return Object.entries(g).map(([k, list]) => ({ id: k, root: list.find(p => p.id === k) || list[0], list, at: Math.min(...list.map(p => p.trashedAt)) })).sort((a, b) => b.at - a.at); };
+function paintTrash(){ const n = $("#nTrash"); if (n) { const c = trashGroups().length; n.textContent = c ? c : ""; } }
+async function restoreTrash(gid){
+  const g = trashGroups().find(x => x.id === gid); if (!g) return;
+  const root = g.root, parentOk = root.parent && byId(root.parent);
+  const upd = g.list.map(p => ({ id: p.id, data: { trashedAt: null, trashedBy: null, trashGroup: null } }));
+  if (!parentOk) upd.find(x => x.id === root.id).data = { ...upd.find(x => x.id === root.id).data, parent: null, order: kids(null).length };
+  try { await store.batchPages(upd); toast(`‘${root.title || "제목 없음"}’을(를) 되살렸어요${!parentOk && root.parent ? " (원래 위 페이지가 없어서 최상위로)" : ""}`); }
+  catch (ex) { toast(errMsg(ex)); }
+}
+let purging = false;
+async function purgeOld(){ /* 휴지통에 7일 넘은 페이지 영구 삭제 — 누가 위키를 열든 그때 정리 */
+  if (purging) return; const limit = Date.now() - TRASH_DAYS * 864e5;
+  const old = allPages.filter(p => p.trashedAt && p.trashedAt < limit).map(p => p.id); if (!old.length) return;
+  purging = true; try { await store.deletePages(old); } catch {} purging = false;
+}
+function showTrash(){
+  renderTree(); document.title = "휴지통 · " + SPACE;
+  const gs = trashGroups(), left = at => Math.max(0, Math.ceil((at + TRASH_DAYS * 864e5 - Date.now()) / 864e5));
+  main().innerHTML = `<div class="pagehd"><div class="crumbs"><a href="#/">${esc(SPACE)}</a><span class="sep">/</span><span>휴지통</span></div></div>
+  <div class="content"><h1 class="ptitle">휴지통</h1><div class="byline">지운 페이지는 ${TRASH_DAYS}일 동안 여기 있다가 자동으로 영구 삭제돼요.</div>
+  ${gs.length ? `<div style="border:1px solid var(--line);border-radius:6px">${gs.map(g => `<div class="trow2">
+      <div class="pm"><b>${esc(g.root.title || "제목 없음")}</b><small>${g.list.length > 1 ? `하위 ${g.list.length - 1}개 포함 · ` : ""}${esc((g.root.trashedBy && g.root.trashedBy.name) || "")} · ${when(g.at)} 지움</small></div>
+      <span class="left">${left(g.at) ? left(g.at) + "일 뒤 삭제" : "곧 삭제"}</span>
+      <button class="btn sm subtle" data-tv="${esc(g.id)}">보기</button><button class="btn sm" data-tr="${esc(g.id)}">되살리기</button><button class="btn sm subtle" data-td="${esc(g.id)}" style="color:var(--danger)">영구 삭제</button></div>`).join("")}</div>`
+    : `<div class="empty"><b>휴지통이 비어 있어요</b>지운 페이지가 여기 ${TRASH_DAYS}일 동안 남아요.</div>`}</div>`;
+  const find = id => gs.find(g => g.id === id);
+  main().querySelectorAll("[data-tr]").forEach(b => b.onclick = () => restoreTrash(b.dataset.tr));
+  main().querySelectorAll("[data-tv]").forEach(b => b.onclick = () => { const g = find(b.dataset.tv); if (!g) return;
+    modal(`<header><h2>${esc(g.root.title || "제목 없음")} <small style="color:var(--muted);font-weight:400;font-size:13px">휴지통</small></h2><button class="ibtn" data-close>✕</button></header><div class="mb"><div class="doc" id="tvDoc">${sanitize(g.root.html) || `<p style="color:var(--muted)">내용 없음</p>`}</div></div>
+      <footer><button class="btn subtle" data-close>닫기</button><button class="btn primary" id="tvR">되살리기</button></footer>`, true);
+    renderExtras($("#tvDoc"), g.root.id); $("#tvR").onclick = () => { closeModal(); restoreTrash(g.id); }; });
+  main().querySelectorAll("[data-td]").forEach(b => b.onclick = () => { const g = find(b.dataset.td); if (!g) return;
+    askModal("영구 삭제", `‘${esc(g.root.title || "제목 없음")}’${g.list.length > 1 ? `과 하위 ${g.list.length - 1}개` : ""}를 영구 삭제할까요?<br><span style="color:var(--muted);font-size:13px">되살릴 수 없어요.</span>`, "영구 삭제",
+      async () => { try { await store.deletePages(g.list.map(p => p.id)); toast("영구 삭제했어요"); } catch (ex) { toast(errMsg(ex)); } }, true); });
 }
 
 /* ───────── 화면: 홈·최근·검색 ───────── */
@@ -1555,7 +1606,7 @@ async function bootCloud(){
     if (!u) { isAdmin = false; if (unsubReq) { unsubReq(); unsubReq = null; } const gm = gateMsg; gateMsg = null; showGate(gm ? gm[0] : "", gm ? gm[1] : ""); return; }
     if (signingUp) return;
     showApp(); main().innerHTML = `<div class="content"><div class="empty">불러오는 중…</div></div>`;
-    unsub = fs.collection("wiki_pages").onSnapshot(s => { pages = s.docs.map(d => ({ id: d.id, ...d.data() })); const first = !ready; ready = true; renderTree();
+    unsub = fs.collection("wiki_pages").onSnapshot(s => { setPages(s.docs.map(d => ({ id: d.id, ...d.data() }))); const first = !ready; ready = true; renderTree();
         if (first || !editing) route(true); else renderTree(); },
       ex => { if (/permission/i.test(ex.code || ex.message)) { if (!signingUp) showPending(u, false); } else toast("불러오지 못했어요. 새로고침해 보세요"); });
     checkAdmin();

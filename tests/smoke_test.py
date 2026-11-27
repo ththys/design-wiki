@@ -128,8 +128,18 @@ with sync_playwright() as p:
     pg.click("#themeBtn"); t1 = pg.evaluate("document.documentElement.dataset.theme"); pg.click("#themeBtn")
     check("다크·라이트 전환", t1 in ("dark", "light"))
     pg.goto(URL + f"#/p/{cid}"); pg.wait_for_timeout(200)
-    pg.click("#pMore"); pg.locator(".menu button", has_text="삭제").click(); pg.click("#delYes"); pg.wait_for_timeout(300)
-    check("페이지 삭제", pg.evaluate("JSON.parse(localStorage.getItem('wiki-v1')).pages.length") == 1)
+    pg.click("#pMore"); pg.locator(".menu button", has_text="삭제").click(); pg.click("#askOk"); pg.wait_for_timeout(300)
+    gone = pg.locator(f'.trow[data-row="{cid}"]').count() == 0
+    kept = pg.evaluate(f"!!(JSON.parse(localStorage.getItem('wiki-v1')).pages.find(p=>p.id==='{cid}')||{{}}).trashedAt")
+    pg.click('[data-nav="trash"]'); pg.wait_for_timeout(200)
+    listed = pg.locator(".trow2", has_text="보스 A").count() == 1 and "7일 뒤 삭제" in pg.inner_text("#main") and pg.inner_text("#nTrash") == "1"
+    pg.click(f'[data-tr="{cid}"]'); pg.wait_for_timeout(300)
+    back = pg.locator(f'.trow[data-row="{cid}"]').count() == 1 and pg.inner_text("#nTrash") == ""
+    check("삭제 → 휴지통 → 되살리기", gone and kept and listed and back, f"{gone},{kept},{listed},{back}")
+    pg.goto(URL + f"#/p/{cid}"); pg.wait_for_timeout(200)
+    pg.click("#pMore"); pg.locator(".menu button", has_text="삭제").click(); pg.click("#askOk"); pg.wait_for_timeout(200)
+    pg.goto(URL + "#/trash"); pg.wait_for_timeout(200); pg.click(f'[data-td="{cid}"]'); pg.click("#askOk"); pg.wait_for_timeout(300)
+    check("휴지통에서 영구 삭제", pg.evaluate("JSON.parse(localStorage.getItem('wiki-v1')).pages.length") == 1 and "비어 있어요" in pg.inner_text("#main"))
 
     # 12) 붙여 넣은 HTML 정리(스크립트 제거)
     clean = pg.evaluate("sanitize('<p onclick=x>a<script>alert(1)</script><img src=x onerror=y><a href=\"javascript:z\">b</a></p>')") if pg.evaluate("typeof sanitize") == "function" else None
@@ -196,6 +206,14 @@ with sync_playwright() as p:
     blank = pg.input_value("#edTitle") == "" and pg.locator("#ed").count() == 1
     pg.click(".logo"); pg.wait_for_timeout(250); clean_home = pg.locator("#ed").count() == 0
     check("편집 중 로고·만들기 → 화면 안 창으로 묻고 이동", asked and home and asked2 and blank and clean_home, f"{asked},{home},{asked2},{blank},{clean_home}")
+
+    # 15) 휴지통 7일 지나면 자동 영구 삭제
+    pg.evaluate("""() => { const d = JSON.parse(localStorage.getItem('wiki-v1')); const t = Date.now();
+      d.pages.push({id:'old1',title:'오래된',html:'',parent:null,order:9,trashedAt:t-8*864e5,trashGroup:'old1'}, {id:'new1',title:'최근 지움',html:'',parent:null,order:10,trashedAt:t-2*864e5,trashGroup:'new1'});
+      localStorage.setItem('wiki-v1', JSON.stringify(d)); }""")
+    pg.goto(URL + "#/trash"); pg.reload(); pg.wait_for_timeout(400)
+    ids = pg.evaluate("JSON.parse(localStorage.getItem('wiki-v1')).pages.map(p=>p.id)")
+    check("7일 지난 휴지통 자동 삭제 (2일 된 건 남음)", "old1" not in ids and "new1" in ids and "5일 뒤 삭제" in pg.inner_text("#main"), str(ids))
     check("자바스크립트 오류 없음", not errs, "; ".join(errs[:3]))
     b.close()
 srv.shutdown()
