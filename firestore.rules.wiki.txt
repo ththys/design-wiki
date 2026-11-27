@@ -1,0 +1,21 @@
+// 아래 내용을 Firebase 콘솔 > Firestore > 규칙 의 "match /databases/{database}/documents {" 안쪽,
+// 기존 monsters / site / portfolio 규칙 옆에 붙여 넣으세요. (기존 규칙은 지우지 마세요)
+// 팀원 이메일은 여기(공개 저장소)가 아니라 콘솔에만 적어요.
+
+    function isWikiTeam() {
+      return request.auth != null && request.auth.token.email in [
+        'me@example.com',
+        'teammate1@example.com'
+      ];
+    }
+    match /wiki_pages/{id} {
+      allow read, write: if isWikiTeam();
+    }
+    match /wiki_history/{id} {
+      allow read, create: if isWikiTeam();
+    }
+    match /wiki_comments/{id} {
+      allow read: if isWikiTeam();
+      allow create: if isWikiTeam() && request.resource.data.by.email == request.auth.token.email;
+      allow delete: if isWikiTeam() && resource.data.by.email == request.auth.token.email;
+    }
