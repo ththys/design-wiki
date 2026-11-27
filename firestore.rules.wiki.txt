@@ -30,7 +30,7 @@
     }
     // 알림 (@멘션·답글·내 페이지 댓글): 받는 사람만 읽고 지움
     match /wiki_notes/{id} {
-      allow read, update, delete: if request.auth != null && resource.data.to == request.auth.token.email;
+      allow read, update, delete: if request.auth != null && resource.data.to == request.auth.token.email.lower();
       allow create: if isWikiTeam() && request.resource.data.from.email == request.auth.token.email;
     }
     // @멘션에 쓰는 팀원 이름 목록
