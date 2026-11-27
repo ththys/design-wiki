@@ -38,7 +38,7 @@ with sync_playwright() as p:
     rows = pg.evaluate("document.querySelector('#ed table').rows.length")
     pg.click("#edSave"); pg.wait_for_timeout(300)
     doc = pg.inner_html("#pDoc")
-    check("새 페이지 게시: 제목·소제목·할 일·표", "#/p/" in pg.evaluate("location.hash") and "<h2>핵심 규칙</h2>" in doc and 'class="check"' in doc and "<table>" in doc and rows == 4 and has_tbl_bar, f"{rows},{has_tbl_bar},{doc[:300]}")
+    check("새 페이지 게시: 제목·소제목·할 일·표", "#/p/" in pg.evaluate("location.hash") and ">핵심 규칙</h2>" in doc and 'class="check"' in doc and "<table>" in doc and rows == 4 and has_tbl_bar, f"{rows},{has_tbl_bar},{doc[:300]}")
     pid = pg.evaluate("location.hash.split('/')[2]")
     check("트리에 표시", pg.locator(f'.trow[data-row="{pid}"]').count() == 1)
 
@@ -134,6 +134,56 @@ with sync_playwright() as p:
     clean = pg.evaluate("sanitize('<p onclick=x>a<script>alert(1)</script><img src=x onerror=y><a href=\"javascript:z\">b</a></p>')") if pg.evaluate("typeof sanitize") == "function" else None
     check("HTML 정리", clean is None or ("script" not in clean and "onerror" not in clean and "javascript" not in clean), str(clean))
 
+
+    # 13) 컨플루언스식 빠른 입력·요소·단축키
+    def fresh(title):
+        pg.goto(URL + "#/"); pg.wait_for_timeout(150); pg.goto(URL + "#/new"); pg.wait_for_timeout(250); pg.fill("#edTitle", title); pg.click("#ed")
+    def edh(): return pg.inner_html("#ed")
+    def clear_ed(html="<p><br></p>"):
+        pg.evaluate("h => { const e = document.querySelector('#ed'); e.innerHTML = h; e.focus(); const r = document.createRange(); r.selectNodeContents(e.querySelector('p') || e); r.collapse(false); getSelection().removeAllRanges(); getSelection().addRange(r); }", html)
+    pg.on("dialog", lambda d: d.accept())
+    fresh("빠른 입력")
+    pg.keyboard.type("# "); r1 = "<h1>" in edh()
+    clear_ed(""); pg.keyboard.type("## x"); r_first = "<h2>x</h2>" in edh()
+    clear_ed("<p>뒤 글</p>"); pg.keyboard.press("Home"); pg.keyboard.type("### "); r_mid = "<h3>뒤 글</h3>" in edh()
+    res = {}
+    for tok, want in [("* ", "<ul><li>"), ("- ", "<ul><li>"), ("1. ", "<ol><li>"), ("> ", "<blockquote>"), ("--- ", "<hr>"), ("<> ", 'class="decision"'), ("``` ", "<pre>"), ("[] ", 'class="check"'), ("#### ", "<h4>")]:
+        clear_ed(); pg.keyboard.type(tok); res[tok] = want in edh()
+    clear_ed(); pg.keyboard.type("## "); pg.keyboard.press("Control+z"); undo = "<h2>" not in edh() and "##" in pg.inner_text("#ed")
+    check("줄 맨 앞 빠른 서식 (첫 줄·글 앞에서도)", r1 and r_first and r_mid and all(res.values()) and undo, f"{r1},{r_first},{r_mid},{res},{undo}")
+    clear_ed(); pg.keyboard.type("가 **굵게** 나 *기울임* ~~취소~~ `코드` [구글](https://google.com) 끝"); h = edh()
+    inl = all(x in h for x in ["<b>굵게</b>", "<i>기울임</i>", "<s>취소</s>", "<code>코드</code>", 'href="https://google.com"'])
+    clear_ed(); pg.keyboard.type("공격력*1.5 방어*2"); no_false = "<i>" not in edh()
+    check("글 중간 빠른 서식", inl and no_false, h)
+    clear_ed(); pg.keyboard.type("마감 //"); pg.wait_for_timeout(100); date = pg.locator("#ed time.date").count() == 1 and pg.locator(".chippop input[type=date]").count() == 1
+    pg.keyboard.type("까지"); popclosed = pg.locator(".chippop").count() == 0
+    pg.keyboard.type(" :smi"); pg.wait_for_timeout(100); pg.keyboard.press("Enter"); emo = "😀" in pg.inner_text("#ed")
+    check("// 날짜 · : 이모지", date and popclosed and emo, f"{date},{popclosed},{emo},{edh()}")
+    clear_ed(); pg.keyboard.type("/status"); pg.wait_for_timeout(100); pg.keyboard.press("Enter"); pg.wait_for_timeout(100)
+    pg.keyboard.type("진행 중"); pg.click('.chippop [data-c="blue"]'); pg.keyboard.press("Enter"); pg.wait_for_timeout(50)
+    st = pg.locator("#ed span.status.blue", has_text="진행 중").count() == 1
+    pg.keyboard.press("End"); pg.keyboard.press("Enter"); pg.keyboard.type("/expand"); pg.wait_for_timeout(100); pg.keyboard.press("Enter"); pg.keyboard.type("자세히"); pg.keyboard.press("Enter"); pg.keyboard.type("숨은 내용")
+    ex = pg.locator("#ed .expand .xtitle", has_text="자세히").count() == 1 and pg.locator("#ed .expand .xbody", has_text="숨은 내용").count() == 1
+    pg.keyboard.press("Enter"); pg.keyboard.press("Enter"); pg.keyboard.type("/toc"); pg.wait_for_timeout(100); pg.keyboard.press("Enter")
+    pg.keyboard.type("/2단"); pg.wait_for_timeout(100); pg.keyboard.press("Enter"); pg.keyboard.type("왼쪽")
+    lay = pg.locator("#ed .cols.c2 .col").count() == 2
+    pg.locator("#ed > p").last.click(); pg.keyboard.type("/include"); pg.wait_for_timeout(100); pg.keyboard.press("Enter"); pg.wait_for_timeout(100); pg.keyboard.type("전투"); pg.wait_for_timeout(100); pg.keyboard.press("Enter"); pg.wait_for_timeout(100)
+    inc = pg.locator("#ed div.include").count() == 1
+    pg.locator("#ed > p").last.click(); pg.keyboard.type("제목줄"); pg.keyboard.press("Control+Alt+2"); hk = pg.locator("#ed h2", has_text="제목줄").count() == 1
+    pg.keyboard.press("Enter"); pg.keyboard.type("목록줄"); pg.keyboard.press("Control+Shift+8"); ul = pg.locator("#ed ul li", has_text="목록줄").count() == 1
+    pg.keyboard.press("Enter"); pg.keyboard.press("Enter"); pg.keyboard.type("칠하기"); pg.keyboard.press("Shift+Home"); pg.keyboard.press("Control+Alt+y"); mk = pg.locator("#ed mark", has_text="칠하기").count() == 1
+    check("/ 요소 (상태·접기·목차·단·불러오기) · 편집 단축키", st and ex and lay and inc and hk and ul and mk, f"{st},{ex},{lay},{inc},{hk},{ul},{mk}")
+    pg.keyboard.press("Control+Enter"); pg.wait_for_timeout(300)
+    on_view = pg.locator("#pDoc").count() == 1
+    hidden = not pg.locator("#pDoc .expand .xbody").is_visible()
+    pg.click("#pDoc .expand .xtitle"); shown = pg.locator("#pDoc .expand .xbody").is_visible()
+    toc = pg.locator("#pDoc .toc a[data-to]").count() >= 1
+    incv = "조심" in pg.inner_text("#pDoc .include")
+    chips = pg.locator("#pDoc span.status.blue").count() == 1 and pg.locator("#pDoc mark").count() == 1 and pg.locator("#pDoc ul li", has_text="목록줄").count() == 1
+    check("보기 화면: 접기 열기·목차·불러오기·배지", on_view and hidden and shown and toc and incv and chips, f"{on_view},{hidden},{shown},{toc},{incv},{chips}")
+    pg.mouse.click(5, 300); pg.keyboard.press("Shift+Slash"); pg.wait_for_timeout(100); keys = pg.locator(".keys .ours").count() == 1
+    pg.keyboard.press("Escape"); pg.keyboard.press("BracketLeft"); side = pg.evaluate("document.body.classList.contains('sidehide')"); pg.keyboard.press("BracketLeft")
+    check("? 단축키 창 · [ 왼쪽 메뉴 접기", keys and side, f"{keys},{side}")
     check("자바스크립트 오류 없음", not errs, "; ".join(errs[:3]))
     b.close()
 srv.shutdown()

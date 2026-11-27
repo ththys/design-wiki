@@ -26,7 +26,7 @@
 |---|---|
 | 로컬로 보기 | `python3 -m http.server` 후 `http://localhost:8000/index.html?local` (`?local` = 클라우드 없이 이 브라우저에만 저장) |
 | 문법 확인 | `node -e "const s=require('fs').readFileSync('index.html','utf8');[...s.matchAll(/<script>([\s\S]*?)<\/script>/g)].forEach(x=>new Function(x[1]));console.log('ok')"` |
-| 스모크 테스트 | `python3 tests/smoke_test.py` (Playwright + Chromium 필요, 18개 항목, 로컬 모드. 마지막 줄 `OK`) |
+| 스모크 테스트 | `python3 tests/smoke_test.py` (Playwright + Chromium 필요, 25개 항목, 로컬 모드. 마지막 줄 `OK`) |
 | 배포 | `git push` → GitHub Pages가 자동 배포. 확인: `gh api "repos/ththys/design-wiki/actions/runs?per_page=1" --jq '.workflow_runs[0]\|.head_sha+" "+.status+" "+(.conclusion//"")'` |
 
 - 커밋 메시지: 한국어 한 줄로 무엇이 바뀌었는지.
@@ -72,11 +72,12 @@
 - 히스토리·댓글은 `where("pageId","==",id)`만 쓰고 정렬은 브라우저에서 함 → **복합 색인 필요 없음**. `orderBy`를 추가하면 색인을 만들어야 하니 주의.
 
 ### 브라우저 저장 키
-`wiki-v1`(로컬 모드 데이터), `wiki-open`(트리에서 펼친 페이지), `wiki-theme`(다크/라이트), `wiki-full`(전체 너비 보기), `wiki-draft:<페이지id>`(편집 임시 저장)
+`wiki-v1`(로컬 모드 데이터), `wiki-open`(트리에서 펼친 페이지), `wiki-theme`(다크/라이트), `wiki-full`(전체 너비 보기), `wiki-draft:<페이지id>`(편집 임시 저장), `wiki-side`(왼쪽 메뉴 접힘)
 
 ### 본문 HTML
-- 저장·보기·붙여 넣기 모두 `sanitize()`를 거침. 허용 태그: `P H1 H2 H3 B I U S A UL OL LI BLOCKQUOTE PRE CODE HR BR TABLE THEAD TBODY TR TH TD FIGURE FIGCAPTION IMG VIDEO DIV`.
+- 저장·보기·붙여 넣기 모두 `sanitize()`를 거침. 허용 태그: `P H1~H6 B I U S SUB SUP MARK A UL OL LI BLOCKQUOTE PRE CODE HR BR TABLE THEAD TBODY TR TH TD FIGURE FIGCAPTION IMG VIDEO DIV` + `TIME.date`, `SPAN.status`. 글 속 `\u200b`(커서 빼기용)는 저장할 때 지움.
 - 특별한 모양: 패널 `div.panel.(info|note|warn|ok|err)`, 할 일 `ul.check > li(.done)`, 페이지 링크 `a.plink[data-page=id]`, 그림 크기 `figure.w-s|w-m`. 이미지·영상 주소는 `https://` 또는 `data:image/`만.
+- 컨플루언스식 요소: 상태 `span.status.(grey|blue|green|yellow|red|purple)`, 날짜 `time.date[datetime=YYYY-MM-DD]`, 결정 `ul.decision>li`, 접기 `div.expand>p.xtitle+div.xbody`(보기에서 `.open` 토글), 단 `div.cols.c2|c3>div.col`, 목차 `div.toc`(빈 상자, 보기 때 `renderExtras()`가 채움), 페이지 불러오기 `div.include[data-page]`(빈 상자, 보기 때 채움, 한 단계만), 정렬 `p/h*.al-c|al-r`. 편집기에서는 `prepEditor()`가 상자들을 `contenteditable=false`로 바꿈.
 
 ## 6. 화면 (주소 해시)
 
@@ -91,8 +92,8 @@
 | `#/members` | 팀원 관리 (관리자만): 가입 막기 토글, 가입 요청 승인/거절, 팀원 내보내기 | 팀원 관리 |
 
 - 왼쪽 **페이지 트리**: 펼치기/접기, 끌어 놓기(상자 가운데=그 아래로, 위·아래 가장자리=앞뒤 순서, 빈 곳=최상위, 자기 하위로는 막힘, 알림에서 되돌리기), 우클릭·⋯ 메뉴(열기·편집·하위 만들기·복제·링크 복사·위로·아래로·최상위로·삭제).
-- **편집기**(`contenteditable`): 글 모양(본문/제목1~3), 굵게·기울임·밑줄·취소선·인라인 코드, 목록·번호·할 일, 링크(Ctrl+K), `[[`로 페이지 링크 고르기, 이미지·영상(버튼·붙여 넣기·끌어 놓기 → Cloudinary), 표(행·열 추가/삭제, 머리 행), 패널 5종, 인용, 코드 블록, 구분선. `/` 치면 넣기 메뉴. `## ` `- ` `1. ` `[] ` `> ` ```` ``` ```` + 띄어쓰기 = 빠른 서식. 4초마다 임시 저장, Ctrl+S 저장, 저장 안 하고 나가면 확인.
-- 단축키: `/` 검색, `E` 편집(보기 화면).
+- **편집기**(`contenteditable`): 컨플루언스와 같은 입력·키 (전체 목록은 `showKeys()` 단축키 창 = `?`, `Ctrl+/`, 상단 ⌨). 줄 맨 앞 `# ~ ###### * - 1. > ``` --- [] <>` + 띄어쓰기, 글 중간 `**굵게** *기울임* ~~취소~~ \`코드\` [제목](주소)`, `//` 날짜, `:` 이모지, `/` 넣기 메뉴(`/expand /status /date /decision /toc /layout /include` 등), `[[` 페이지 링크(우리만). 빠른 서식은 **keydown이 아니라 input 이벤트**에서 처리(한글 입력기 때문) — `blockAuto()`, `inlineAuto()`. 자동 서식 직후 Ctrl+Z는 `autoUndo`로 되돌림. 편집 단축키는 `editKeys()`(e.code 기준). 4초마다 임시 저장, Ctrl+S 저장, Ctrl+Enter 게시.
+- 전역 단축키(`wireKeys()`): `E` 편집, `/`·Alt+Shift+Z 검색, `C`·Win+Alt+C 새 페이지, `[`·Ctrl+[ 왼쪽 메뉴 접기(`wiki-side`), `?` 단축키 창, Ctrl+Alt+H 홈, Ctrl+Alt+G 최근, Ctrl+Alt+C 댓글, Ctrl+Alt+S 링크 복사, G→R / G→D.
 - 보기 화면에서 할 일 체크박스를 누르면 편집 없이 바로 저장.
 - 남이 편집 중에 먼저 저장했으면 덮어쓰기 전에 묻기(이전 버전은 기록에 남음).
 - 다크/라이트 전환 버튼(상단 오른쪽).
