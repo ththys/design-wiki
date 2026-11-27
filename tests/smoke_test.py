@@ -288,7 +288,7 @@ with sync_playwright() as p:
     pick = pg.locator("#pick button", has_text="김기획").count() == 1; pg.keyboard.press("Enter"); pg.keyboard.type("//"); pg.wait_for_timeout(100); pg.keyboard.press("Escape")
     pg.keyboard.press("Control+Enter"); pg.wait_for_timeout(400)
     h = pg.inner_html("#cmtList")
-    rich = all(x in h for x in ["<b>중요</b>", 'class="check"', 'class="mention"', 'data-email="kim@x.com"', 'class="date"'])
+    rich = all(x in h for x in ["<b>중요</b>", 'class="check"', 'class="mention"', 'data-email="kim@x.com"', 'class="date'])
     nts = pg.evaluate("JSON.parse(localStorage.getItem('wiki-v1')).notes.filter(n=>n.to==='kim@x.com').map(n=>n.kind)")
     check("댓글 서식·할 일·@멘션·// 날짜 + 멘션 알림(작성자 중복 없음)", bell and pick and rich and nts == ["mc"], f"{bell},{pick},{rich},{nts}")
     cm = pg.locator("#cmtList .cmt").first
@@ -322,6 +322,22 @@ with sync_playwright() as p:
     sw = pg.evaluate("document.querySelector('.side').getBoundingClientRect().width"); pg.reload(); pg.wait_for_timeout(300); sw2 = pg.evaluate("document.querySelector('.side').getBoundingClientRect().width")
     pg.dblclick(".side-rz"); sw3 = pg.evaluate("document.querySelector('.side').getBoundingClientRect().width")
     check("본문 너비 보통→넓게→전체(편집도 같이)·왼쪽 메뉴 끌어서 넓히기", w1 > w0 and w2 >= w1 and "더 넓게" in lblx and "전체" in lbl and abs(we - w2) < 80 and 400 <= sw <= 440 and abs(sw2 - sw) < 2 and sw3 == 280, f"{w0},{w1},{w2},{lbl},{we},{sw},{sw2},{sw3}")
+
+    # 20) 줄 중간 [] → 할 일, 할 일 속 날짜 지나면 빨강
+    pg.goto(URL + "#/p/cm1"); pg.wait_for_timeout(300)
+    pg.click("#cIn"); pg.keyboard.type("@김"); pg.wait_for_timeout(100); pg.keyboard.press("Enter"); pg.keyboard.type("테스트 [] ")
+    mid = pg.locator("#cIn ul.check li span.mention").count() == 1 and "[]" not in pg.inner_text("#cIn") and "테스트" in pg.inner_text("#cIn ul.check li")
+    pg.keyboard.type("//"); pg.wait_for_timeout(100); today = pg.locator("#cIn ul.check li time.date.today").count() == 1
+    pg.fill(".chippop input[type=date]", "2020-01-01"); pg.wait_for_timeout(50); late_ed = pg.locator("#cIn time.date.late").count() == 1
+    pg.keyboard.press("Escape"); pg.click("#cIn"); pg.keyboard.press("Control+Enter"); pg.wait_for_timeout(400)
+    late_v = pg.locator("#cmtList .ct time.date.late").count() >= 1
+    pg.locator("#cmtList .ct ul.check li", has_text="테스트").first.click(position={"x": 6, "y": 8}); pg.wait_for_timeout(300)
+    done_v = pg.locator("#cmtList .ct time.date.doneD").count() >= 1
+    pg.goto(URL + "#/p/cm1/edit"); pg.wait_for_timeout(300); pg.locator("#ed p").last.click(); pg.keyboard.press("End"); pg.keyboard.press("Enter")
+    pg.keyboard.type("보스 패턴 정리 [] 마감 "); pg.keyboard.type("//"); pg.wait_for_timeout(100); pg.fill(".chippop input[type=date]", "2020-01-01"); pg.keyboard.press("Escape")
+    pg.click("#ed"); pg.keyboard.press("Control+s"); pg.wait_for_timeout(400)
+    page_late = pg.locator("#pDoc ul.check li", has_text="보스 패턴 정리").locator("time.date.late").count() == 1
+    check("줄 중간 [] → 할 일(멘션 유지) · 할 일 날짜 오늘=노랑·지남=빨강·끝냄=회색 (댓글·글)", mid and today and late_ed and late_v and done_v and page_late, f"{mid},{today},{late_ed},{late_v},{done_v},{page_late}")
     check("자바스크립트 오류 없음", not errs, "; ".join(errs[:3]))
     b.close()
 srv.shutdown()

@@ -79,6 +79,7 @@
 ### 본문 HTML
 - 저장·보기·붙여 넣기 모두 `sanitize()`를 거침. 허용 태그: `P H1~H6 B I U S SUB SUP MARK A UL OL LI BLOCKQUOTE PRE CODE HR BR TABLE THEAD TBODY TR TH TD FIGURE FIGCAPTION IMG VIDEO DIV` + `TIME.date`, `SPAN.status`. 글 속 `\u200b`(커서 빼기용)는 저장할 때 지움.
 - 특별한 모양: 패널 `div.panel.(info|note|warn|ok|err)`, 할 일 `ul.check > li(.done)`, 페이지 링크 `a.plink[data-page=id]`, 그림 크기 `figure.w-s|w-m`. 이미지·영상 주소는 `https://` 또는 `data:image/`만.
+- **할 일 기한**: `ul.check>li` 안의 `time.date`는 `markDue()`가 지난 날짜=`.late`(빨강), 오늘=`.today`(노랑), 끝낸 일=`.doneD`(회색 줄)로 칠함(저장 안 되는 보기용 클래스). 줄 **중간**에서 `[] ` 쳐도 그 줄 전체가 할 일이 됨(`blockAuto`).
 - **댓글**: `richBox()` = 서식 댓글 상자(페이지 편집기와 같은 빠른 입력 `richInput()`, 위쪽 작은 도구 막대). 포커스하면 전역 `ed`를 그 상자로 바꿔서 공용 함수(날짜·멘션·선택기)를 그대로 씀(페이지 편집 중이 아닐 때만). 답글 한 단계, 편집(본인), 반응 6개, 할 일 체크는 보기에서 바로 저장, 댓글 링크. @멘션 = `span.mention[data-email]`, 사람 목록은 `people()`. 상단 🔔 = `wiki_notes` 실시간 구독.
 - **차트 블록** (본문에 JSON을 속성으로 저장, 보기 때 그림):
   - 플로우차트 `div.flow[data-flow]` = `{dir:"h"|"v", title, lanes[], nodes:[{id,t,s(모양 proc|start|dec|io|sub|doc|note),sub,d,note,tags[],c(색),lp(페이지id)|lu(주소),col(단계 1~),ord}], edges:[{a,b,l(글자),st:"dash",c}]}`. `cleanFlow()`로 정리, `layoutFlow()`가 자동 배치(가장 긴 경로로 단계, 무게중심으로 줄 순서, 뒤로 가는 선은 DFS로 찾아 아래/오른쪽으로 돌려 그림), `mountFlow()`가 그림(보기: 마우스 오버 설명·눌러서 고정·경로 강조·설명 모두 보기·확대·크게 보기 / 편집: 점 끌어 연결). 편집기 `openFlowEditor()`(Tab 다음 상자, 글로 한꺼번에 넣기 `A -> B : 글자`, `-.->` 점선, `{판단}`, `(시작)`).
