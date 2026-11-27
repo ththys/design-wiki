@@ -125,8 +125,11 @@ with sync_playwright() as p:
     # 11) 최근 수정·다크 모드·삭제
     pg.click('[data-nav="recent"]'); pg.wait_for_timeout(200)
     check("최근 수정", pg.locator(".plist a").count() == 2)
-    pg.click("#themeBtn"); t1 = pg.evaluate("document.documentElement.dataset.theme"); pg.click("#themeBtn")
-    check("다크·라이트 전환", t1 in ("dark", "light"))
+    pg.click("#themeBtn"); n_th = pg.locator(".menu.thm [data-th]").count(); pg.click('.menu.thm [data-th="forest"]'); pg.wait_for_timeout(50)
+    t1 = pg.evaluate("[document.documentElement.dataset.theme, document.documentElement.dataset.tone, getComputedStyle(document.body).backgroundColor]")
+    pg.reload(); pg.wait_for_timeout(300); t2 = pg.evaluate("[document.documentElement.dataset.theme, document.documentElement.dataset.tone]")
+    pg.click("#themeBtn"); pg.click('.menu.thm [data-th="paper"]'); t3 = pg.evaluate("document.documentElement.dataset.tone"); pg.click("#themeBtn"); pg.click('.menu.thm [data-th="light"]'); pg.mouse.click(700, 600)
+    check("테마 8개 고르기·새로고침해도 유지", n_th == 8 and t1[:2] == ["forest", "dark"] and t1[2] == "rgb(20, 28, 24)" and t2 == ["forest", "dark"] and t3 == "light", f"{n_th},{t1},{t2},{t3}")
     pg.goto(URL + f"#/p/{cid}"); pg.wait_for_timeout(200)
     pg.click("#pMore"); pg.locator(".menu button", has_text="삭제").click(); pg.click("#askOk"); pg.wait_for_timeout(300)
     gone = pg.locator(f'.trow[data-row="{cid}"]').count() == 0

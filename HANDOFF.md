@@ -72,7 +72,7 @@
 - 히스토리·댓글은 `where("pageId","==",id)`만 쓰고 정렬은 브라우저에서 함 → **복합 색인 필요 없음**. `orderBy`를 추가하면 색인을 만들어야 하니 주의.
 
 ### 브라우저 저장 키
-`wiki-v1`(로컬 모드 데이터), `wiki-open`(트리에서 펼친 페이지), `wiki-theme`(다크/라이트), `wiki-full`(전체 너비 보기), `wiki-draft:<페이지id>`(편집 임시 저장), `wiki-side`(왼쪽 메뉴 접힘)
+`wiki-v1`(로컬 모드 데이터), `wiki-open`(트리에서 펼친 페이지), `wiki-theme`(테마: auto·light·paper·mint·dark·night·forest·grape — `html[data-theme]`, 어두운 계열은 `html[data-tone="dark"]`. 어두운 테마 전용 CSS는 data-tone으로 쓸 것), `wiki-full`(전체 너비 보기), `wiki-draft:<페이지id>`(편집 임시 저장), `wiki-side`(왼쪽 메뉴 접힘)
 
 ### 본문 HTML
 - 저장·보기·붙여 넣기 모두 `sanitize()`를 거침. 허용 태그: `P H1~H6 B I U S SUB SUP MARK A UL OL LI BLOCKQUOTE PRE CODE HR BR TABLE THEAD TBODY TR TH TD FIGURE FIGCAPTION IMG VIDEO DIV` + `TIME.date`, `SPAN.status`. 글 속 `\u200b`(커서 빼기용)는 저장할 때 지움.

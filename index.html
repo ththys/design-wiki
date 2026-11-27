@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>디자인 위키</title>
-<script>try{var t=localStorage.getItem("wiki-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t;}catch(e){}</script>
+<script>try{var t=localStorage.getItem("wiki-theme"),r=document.documentElement,D=["dark","night","forest","grape"];if(/^(light|dark|paper|mint|night|forest|grape)$/.test(t||""))r.dataset.theme=t;r.dataset.tone=t&&t!=="auto"?(D.indexOf(t)>=0?"dark":"light"):(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");}catch(e){}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
 <style>
@@ -20,11 +20,34 @@
   --hover:#2c333a; --sel:#1c2b41; --brand:#579dff; --brand-h:#85b8ff; --brand-ink:#1d2125; --danger:#f87168;
   --info:#1c2b41; --note:#2b273f; --warn:#332e1b; --ok:#1c3329; --err:#42221f; --code:#161a1d; --shadow:0 8px 24px rgba(0,0,0,.45),0 0 1px rgba(255,255,255,.2);
 }
-@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){
+@media (prefers-color-scheme:dark){ :root:not([data-theme]){
   --bg:#1d2125; --side:#161a1d; --panel:#22272b; --ink:#dee4ea; --sub:#b6c2cf; --muted:#8c9bab; --line:#38414a; --line2:#2c333a;
   --hover:#2c333a; --sel:#1c2b41; --brand:#579dff; --brand-h:#85b8ff; --brand-ink:#1d2125; --danger:#f87168;
   --info:#1c2b41; --note:#2b273f; --warn:#332e1b; --ok:#1c3329; --err:#42221f; --code:#161a1d; --shadow:0 8px 24px rgba(0,0,0,.45),0 0 1px rgba(255,255,255,.2);
 }}
+:root[data-theme="paper"]{
+  --bg:#fbf8f1; --side:#f3eee2; --panel:#fffdf8; --ink:#3b3226; --sub:#5e5242; --muted:#857864; --line:#e3dccb; --line2:#ece6d8;
+  --hover:#f1ebdd; --sel:#f5e6cc; --brand:#b5651d; --brand-h:#96521a; --brand-ink:#ffffff; --code:#f5efe3; --info:#eef3f8;
+}
+:root[data-theme="mint"]{
+  --bg:#f7fcf9; --side:#ecf6f0; --panel:#ffffff; --ink:#16302a; --sub:#3f5c54; --muted:#64807a; --line:#d3e4dc; --line2:#e4efe9;
+  --hover:#e8f3ed; --sel:#d8f1e5; --brand:#12805c; --brand-h:#0b6648; --brand-ink:#ffffff; --code:#f0f7f3;
+}
+:root[data-theme="night"]{
+  --bg:#0f1729; --side:#0b1222; --panel:#152038; --ink:#e2e8f5; --sub:#b4c0d8; --muted:#8593b0; --line:#28365a; --line2:#1d2843;
+  --hover:#1d2843; --sel:#1b2f57; --brand:#6ea8ff; --brand-h:#9cc3ff; --brand-ink:#0f1729; --danger:#ff7b72;
+  --info:#1b2d52; --note:#2a2550; --warn:#3a3418; --ok:#15352a; --err:#45201f; --code:#0b1222; --shadow:0 8px 24px rgba(0,0,0,.5),0 0 1px rgba(255,255,255,.2);
+}
+:root[data-theme="forest"]{
+  --bg:#141c18; --side:#0f1613; --panel:#1a241f; --ink:#dfeae3; --sub:#b2c4b9; --muted:#8aa093; --line:#2e3d35; --line2:#222e28;
+  --hover:#222e28; --sel:#1d3a2c; --brand:#4cc38a; --brand-h:#7ad9aa; --brand-ink:#10160f; --danger:#f87168;
+  --info:#1c2b41; --note:#2b273f; --warn:#332e1b; --ok:#1c3329; --err:#42221f; --code:#0f1613; --shadow:0 8px 24px rgba(0,0,0,.5),0 0 1px rgba(255,255,255,.2);
+}
+:root[data-theme="grape"]{
+  --bg:#1a1625; --side:#14111d; --panel:#221d30; --ink:#e8e3f3; --sub:#c2b8d9; --muted:#998fb3; --line:#3a3252; --line2:#2b2540;
+  --hover:#2b2540; --sel:#33285a; --brand:#a98bff; --brand-h:#c4b0ff; --brand-ink:#1a1625; --danger:#ff7b8a;
+  --info:#1f2a48; --note:#2f2650; --warn:#3a3218; --ok:#183329; --err:#46202a; --code:#14111d; --shadow:0 8px 24px rgba(0,0,0,.5),0 0 1px rgba(255,255,255,.2);
+}
 *{box-sizing:border-box}
 html,body{margin:0;height:100%}
 body{font-family:var(--font);font-size:14px;color:var(--ink);background:var(--bg);-webkit-font-smoothing:antialiased}
@@ -64,6 +87,8 @@ input:focus,textarea:focus,select:focus{border-color:var(--brand)}
 .menu button:hover,.menu a:hover{background:var(--hover)}
 .menu .mhd{padding:8px 14px;color:var(--muted);font-size:12px;border-bottom:1px solid var(--line2);margin-bottom:4px}
 .menu .danger{color:var(--danger)}
+.menu.thm{width:260px} .menu.thm button{gap:10px} .menu.thm i{flex:none;width:22px;height:22px;border-radius:50%;border:1px solid var(--line)}
+.menu.thm span{flex:1;min-width:0} .menu.thm b{display:block;font-weight:500} .menu.thm small{color:var(--muted);font-size:12px}
 .menu hr{border:0;border-top:1px solid var(--line2);margin:4px 0}
 
 /* ── 사이드바 ── */
@@ -309,7 +334,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--brand)}
 .fc-node.c-red{border-left-color:#e2483d} .fc-node.c-purple{border-left-color:#8270db} .fc-node.c-grey{border-left-color:#8590a2}
 .fc-node.sh-start{border-radius:999px;text-align:center;padding:10px 20px;min-height:44px}
 .fc-node.sh-sub{box-shadow:inset 8px 0 0 -6px var(--line),inset -8px 0 0 -6px var(--line);padding:10px 18px}
-.fc-node.sh-note{background:#fff7c2;border-color:#f0d860;color:#5c4b00} :root[data-theme="dark"] .fc-node.sh-note{background:#3d3510;border-color:#7a6a1c;color:#f0e2a0}
+.fc-node.sh-note{background:#fff7c2;border-color:#f0d860;color:#5c4b00} :root[data-tone="dark"] .fc-node.sh-note{background:#3d3510;border-color:#7a6a1c;color:#f0e2a0}
 .fc-node.sh-note .fc-t{color:inherit}
 .fc-node.sh-dec,.fc-node.sh-io,.fc-node.sh-doc{background:none;border:0;box-shadow:none}
 .fc-node.sh-dec{width:170px;min-height:100px;display:grid;place-items:center;text-align:center;padding:16px 30px}
@@ -416,7 +441,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--brand)}
 .hist .hv{padding:6px 20px;overflow:auto;max-height:65vh}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:4px;box-shadow:var(--shadow);z-index:70;display:flex;gap:12px;align-items:center;font-size:14px}
 .toast button{background:none;border:0;color:var(--brand-h);font-weight:600;cursor:pointer;padding:0}
-:root[data-theme="dark"] .toast button{color:#0055cc}
+:root[data-tone="dark"] .toast button{color:#0055cc}
 
 /* 로그인 */
 .gate{min-height:100vh;display:grid;place-items:center;padding:24px;background:linear-gradient(160deg,var(--sel),var(--bg) 60%)}
@@ -1566,7 +1591,7 @@ async function movePage(id, parent, refId, after){
   catch (ex) { toast(errMsg(ex)); }
 }
 function closeMenus(){ document.querySelectorAll(".menu").forEach(m => m.remove()); }
-document.addEventListener("click", e => { if (!e.target.closest(".menu,[data-tmore],#meBtn,#pMore")) closeMenus(); });
+document.addEventListener("click", e => { if (!e.target.closest(".menu,[data-tmore],#meBtn,#pMore,#themeBtn")) closeMenus(); });
 function showMenu(items, anchor, x, y){
   closeMenus(); const m = document.createElement("div"); m.className = "menu";
   m.innerHTML = items.map((it, i) => it === "-" ? "<hr>" : it.head ? `<div class="mhd">${esc(it.head)}</div>` : `<button type="button" data-i="${i}" class="${it.danger ? "danger" : ""}">${esc(it.label)}</button>`).join("");
@@ -2162,11 +2187,27 @@ async function uploadFiles(files){
 }
 
 /* ───────── 로그인·시작 ───────── */
-const isDark = () => { const t = document.documentElement.dataset.theme; return t ? t === "dark" : matchMedia("(prefers-color-scheme: dark)").matches; };
-function paintTheme(){ const b = $("#themeBtn"); if (b) { b.textContent = isDark() ? "☀" : "☾"; b.title = isDark() ? "라이트 모드" : "다크 모드"; } }
+const THEMES = [["auto", "시스템 따라가기", "컴퓨터 설정에 맞춰 밝게·어둡게", "linear-gradient(135deg,#fff 50%,#1d2125 50%)"],
+  ["light", "라이트", "기본 밝은 화면", "#ffffff"], ["paper", "종이", "따뜻한 미색, 눈이 편한 밝은 화면", "#fbf8f1"], ["mint", "민트", "옅은 초록빛 밝은 화면", "#e8f3ed"],
+  ["dark", "다크", "기본 어두운 화면", "#1d2125"], ["night", "밤바다", "남색 어두운 화면", "#0f1729"], ["forest", "숲", "초록빛 어두운 화면", "#141c18"], ["grape", "포도", "보랏빛 어두운 화면", "#1a1625"]];
+const DARK_THEMES = ["dark", "night", "forest", "grape"];
+const curTheme = () => document.documentElement.dataset.theme || "auto";
+const isDark = () => document.documentElement.dataset.tone === "dark";
+function applyTheme(k){ const r = document.documentElement;
+  if (k === "auto") delete r.dataset.theme; else r.dataset.theme = k;
+  r.dataset.tone = k === "auto" ? (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light") : DARK_THEMES.includes(k) ? "dark" : "light";
+  localStorage.setItem("wiki-theme", k); paintTheme(); }
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { if (curTheme() === "auto") applyTheme("auto"); });
+function paintTheme(){ const b = $("#themeBtn"); if (b) { b.textContent = isDark() ? "☾" : "☀"; b.title = "테마: " + (THEMES.find(t => t[0] === curTheme()) || THEMES[0])[1]; } }
+function themeMenu(anchor){
+  closeMenus(); const m = document.createElement("div"); m.className = "menu thm";
+  m.innerHTML = `<div class="mhd">테마</div>` + THEMES.map(([k, l, d, c]) => `<button type="button" data-th="${k}"><i style="background:${c}"></i><span><b>${l}</b><small>${d}</small></span>${curTheme() === k ? "✓" : ""}</button>`).join("");
+  document.body.appendChild(m); const r = anchor.getBoundingClientRect(); m.style.top = (r.bottom + 6) + "px"; m.style.left = Math.max(8, r.right - 260) + "px";
+  m.onclick = e => { const b = e.target.closest("[data-th]"); if (!b) return; applyTheme(b.dataset.th); m.querySelectorAll("[data-th]").forEach(x => x.lastChild.nodeType === 3 && x.lastChild.remove()); b.insertAdjacentText("beforeend", "✓"); };
+}
 function wireChrome(){
   $("#logoName").textContent = SPACE; $("#spaceName").textContent = SPACE; $("#spaceIcon").textContent = initials(SPACE);
-  $("#themeBtn").onclick = () => { const n = isDark() ? "light" : "dark"; document.documentElement.dataset.theme = n; localStorage.setItem("wiki-theme", n); paintTheme(); }; paintTheme();
+  $("#themeBtn").onclick = e => themeMenu(e.currentTarget); paintTheme();
   $("#createBtn").onclick = () => { /* 페이지를 열어 둔 상태면 그 페이지 아래에 만들기 */
     const r = parseHash(), p = (r.v === "page" || r.v === "edit") ? byId(r.id) : null; if (p) { open.add(p.id); saveOpen(); } goTo("#/new" + (p ? "/" + p.id : "")); };
   $("#addRoot").onclick = () => goTo("#/new");
