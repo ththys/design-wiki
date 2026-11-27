@@ -92,6 +92,10 @@ input:focus,textarea:focus,select:focus{border-color:var(--brand)}
 .menu hr{border:0;border-top:1px solid var(--line2);margin:4px 0}
 
 /* ── 사이드바 ── */
+.side-rz{position:absolute;top:0;bottom:0;right:-4px;width:8px;cursor:col-resize;z-index:5}
+.side-rz:hover,body.rzing .side-rz{background:linear-gradient(90deg,transparent 3px,var(--brand) 3px,var(--brand) 5px,transparent 5px)}
+body.rzing{cursor:col-resize;user-select:none} body.rzing *{cursor:col-resize!important}
+.wbtn{white-space:nowrap}
 .side{position:fixed;top:56px;bottom:0;left:0;width:var(--sw,280px);background:var(--side);border-right:1px solid var(--line);display:flex;flex-direction:column;z-index:20}
 .space{display:flex;align-items:center;gap:10px;padding:16px 16px 10px}
 .space i{display:grid;place-items:center;width:32px;height:32px;border-radius:6px;background:linear-gradient(135deg,#1d7afc,#8270db);color:#fff;font-style:normal;font-weight:700}
@@ -1774,6 +1778,26 @@ async function addComment(pageId, rb, parent, host, onDone){
   if (btn && btn.isConnected) btn.disabled = false;
 }
 
+/* ───────── 본문 너비·왼쪽 메뉴 너비 ───────── */
+const WIDTHS = [["n", "보통", "800px"], ["w", "넓게", "1200px"], ["f", "전체", "100%"]];
+const curWidth = () => { const v = localStorage.getItem("wiki-width"); if (WIDTHS.some(x => x[0] === v)) return v; return localStorage.getItem("wiki-full") === "1" ? "f" : "n"; };
+const cwStyle = () => `--cw:${WIDTHS.find(x => x[0] === curWidth())[2]}`;
+const widthBtn = () => { const k = curWidth(), w = WIDTHS.find(x => x[0] === k); return `<button class="btn sm subtle wbtn" data-wbtn title="본문 너비: ${w[1]} (누를 때마다 보통 → 넓게 → 전체)">↔ ${w[1]}</button>`; };
+function cycleWidth(){ const i = WIDTHS.findIndex(x => x[0] === curWidth()), n = WIDTHS[(i + 1) % WIDTHS.length];
+  localStorage.setItem("wiki-width", n[0]); document.querySelectorAll(".content.cwv,.below.cwv").forEach(x => x.style.cssText = cwStyle());
+  document.querySelectorAll("[data-wbtn]").forEach(b => b.outerHTML = widthBtn()); toast("본문 너비: " + n[1]); }
+document.addEventListener("click", e => { if (e.target.closest("[data-wbtn]")) cycleWidth(); });
+function wireSideResize(){
+  const r = document.documentElement, set = w => r.style.setProperty("--sw", w + "px");
+  const saved = parseInt(localStorage.getItem("wiki-sidew")); if (saved >= 200 && saved <= 600) set(saved);
+  const h = document.createElement("div"); h.className = "side-rz"; h.title = "끌어서 왼쪽 메뉴 너비 바꾸기 (두 번 누르면 원래대로)"; $(".side").appendChild(h);
+  h.addEventListener("pointerdown", e => { e.preventDefault(); document.body.classList.add("rzing");
+    const mv = ev => set(Math.max(200, Math.min(600, Math.round(ev.clientX))));
+    const up = ev => { removeEventListener("pointermove", mv); removeEventListener("pointerup", up); document.body.classList.remove("rzing"); localStorage.setItem("wiki-sidew", Math.max(200, Math.min(600, Math.round(ev.clientX)))); };
+    addEventListener("pointermove", mv); addEventListener("pointerup", up); });
+  h.addEventListener("dblclick", () => { r.style.removeProperty("--sw"); localStorage.removeItem("wiki-sidew"); });
+}
+
 /* ───────── 라우팅 ───────── */
 function parseHash(){ const h = decodeURIComponent(location.hash.replace(/^#\/?/, "")); const [a, b, c] = h.split("/");
   if (a === "p" && b) return c === "edit" ? { v: "edit", id: b } : { v: "page", id: b, c: c === "c" ? h.split("/")[3] : null };
@@ -2037,17 +2061,16 @@ function showPage(id){
   if (!p) { main().innerHTML = `<div class="content"><div class="empty"><b>페이지를 찾을 수 없어요</b>지워졌거나 주소가 잘못됐어요. <a href="#/">개요로</a></div></div>`; return; }
   document.title = (p.title || "제목 없음") + " · " + SPACE;
   const back = pages.filter(x => x.id !== id && (x.links || []).includes(id));
-  const full = localStorage.getItem("wiki-full") === "1";
-  main().innerHTML = `<div class="pagehd">${crumbsHTML(p)}<div class="pactions">
+  main().innerHTML = `<div class="pagehd">${crumbsHTML(p)}<div class="pactions">${widthBtn()}
       <button class="btn sm" id="pEdit" title="편집 (E)">✎ 편집</button>
       <button class="ibtn" id="pMore" title="더 보기">⋯</button></div></div>
-    <div class="content ${full ? "full" : ""}">
+    <div class="content cwv" style="${cwStyle()}">
       <h1 class="ptitle">${esc(p.title || "제목 없음")}</h1>
       <div class="byline"><span class="avatar">${esc(initials(p.updatedBy && p.updatedBy.name))}</span>
         <span>${esc((p.createdBy && p.createdBy.name) || "")}님이 만듦 · 마지막 수정 ${esc((p.updatedBy && p.updatedBy.name) || "")} ${when(p.updatedAt)}${p.version ? ` · 버전 ${p.version}` : ""}</span></div>
       <div class="doc" id="pDoc">${sanitize(p.html) || `<p style="color:var(--muted)">아직 내용이 없어요. 편집을 눌러 써 보세요.</p>`}</div>
     </div>
-    <div class="below ${full ? "full" : ""}" style="${full ? "--cw:100%" : ""}">
+    <div class="below cwv" style="${cwStyle()}">
       ${kids(id).length ? `<div class="blinks"><h4>하위 페이지</h4>${kids(id).map(x => `<a href="#/p/${esc(x.id)}">${esc(x.title || "제목 없음")}</a>`).join("")}</div>` : ""}
       ${back.length ? `<div class="blinks"><h4>이 페이지를 링크한 곳 ${back.length}</h4>${back.map(x => `<a href="#/p/${esc(x.id)}">${esc(x.title || "제목 없음")}</a>`).join("")}</div>` : ""}
       <div class="comments" id="cmts"><h4>댓글</h4><div id="cmtList" style="color:var(--muted);font-size:13px">불러오는 중…</div><div id="cNewHost"></div></div>
@@ -2061,7 +2084,7 @@ function showPage(id){
   $("#pEdit").onclick = () => location.hash = "#/p/" + id + "/edit";
   $("#pMore").onclick = e => showMenu([
     { label: "수정 기록", run: () => showHistory(id) },
-    { label: full ? "고정 너비로 보기" : "전체 너비로 보기", run: () => { localStorage.setItem("wiki-full", full ? "0" : "1"); showPage(id); } },
+    { label: "본문 너비 바꾸기 (보통 → 넓게 → 전체)", run: cycleWidth },
     { label: "하위 페이지 만들기", run: () => { open.add(id); saveOpen(); goTo("#/new/" + id); } },
     { label: "복제", run: () => duplicatePage(id) },
     { label: "링크 복사", run: () => copyLink(id) },
@@ -2135,11 +2158,11 @@ function openEditor(p, isNew){
       <button class="t" data-act="link" title="링크 (Ctrl+K)">🔗 링크</button><button class="t" data-act="plink" title="다른 페이지 링크 ([[)">[[ 페이지</button><button class="t" data-act="image" title="이미지·영상 (Ctrl+M)">🖼 이미지</button><button class="t" data-act="table" title="표">▦ 표</button>
       <button class="t" data-act="panel" title="정보 패널">ⓘ 패널</button><button class="t" data-act="quote" title="인용">❝</button><button class="t" data-act="pre" title="코드 블록">{ }</button><button class="t" data-act="hr" title="구분선 (---)">―</button><button class="t" data-act="more" title="더 넣기: 접기·상태·날짜·결정·목차·단 나누기·페이지 불러오기">＋ 더 넣기</button>
       <span class="grow"></span>
-      <span class="edstate" id="edstate"></span>
+      <span class="edstate" id="edstate"></span>${widthBtn()}
       <button class="btn subtle sm" id="edCancel">닫기</button><button class="btn primary sm" id="edSave">${isNew ? "게시" : "업데이트"}</button>
     </div>
     <div class="pagehd">${parent ? crumbsHTML({ parent: parent.id }, "새 페이지") : isNew ? `<div class="crumbs"><a href="#/">${esc(SPACE)}</a><span class="sep">/</span><span>새 페이지</span></div>` : crumbsHTML(p)}</div>
-    <div class="content">
+    <div class="content cwv" style="${cwStyle()}">
       <input class="titlein" id="edTitle" placeholder="제목을 입력하세요" maxlength="200" value="${esc(p.title || "")}">
       <div class="doc editor" id="ed" contenteditable="true" spellcheck="false"></div>
     </div>
@@ -2480,7 +2503,7 @@ function wireChrome(){
   $("#navBtn").onclick = () => document.body.classList.toggle("navopen");
   $("#meBtn").onclick = e => showMenu([{ head: user ? (user.displayName ? user.displayName + " · " : "") + (user.email || "") : "이 브라우저에만 저장 중" },
     ...(user ? [{ label: "로그아웃", run: () => auth.signOut() }] : [])], e.currentTarget);
-  wireTree(); wireSearch(); wireKeys();
+  wireTree(); wireSearch(); wireKeys(); wireSideResize();
   $("#keysBtn").onclick = showKeys; $("#noteBtn").onclick = e => noteMenu(e.currentTarget);
 }
 function setMode(){

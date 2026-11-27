@@ -309,6 +309,18 @@ with sync_playwright() as p:
     pg.keyboard.press("Control+s"); pg.wait_for_timeout(400)
     mp = pg.evaluate("JSON.parse(localStorage.getItem('wiki-v1')).notes.filter(n=>n.to==='lee@x.com').map(n=>n.kind)")
     check("알림 종: 눌러서 이동·읽음 / 페이지 본문 @멘션 알림", readok and mp == ["mp"] and pg.locator("#pDoc span.mention").count() == 1, f"{readok},{mp}")
+
+    # 19) 본문 너비·왼쪽 메뉴 너비
+    pg.goto(URL + "#/p/cm1"); pg.wait_for_timeout(300)
+    w0 = pg.evaluate("document.querySelector('#pDoc').getBoundingClientRect().width")
+    pg.click("[data-wbtn]"); pg.wait_for_timeout(100); w1 = pg.evaluate("document.querySelector('#pDoc').getBoundingClientRect().width")
+    pg.click("[data-wbtn]"); pg.wait_for_timeout(100); w2 = pg.evaluate("document.querySelector('#pDoc').getBoundingClientRect().width"); lbl = pg.inner_text("[data-wbtn]")
+    pg.goto(URL + "#/p/cm1/edit"); pg.wait_for_timeout(300); we = pg.evaluate("document.querySelector('#ed').getBoundingClientRect().width"); pg.click("#edCancel"); pg.wait_for_timeout(200)
+    pg.click("[data-wbtn]"); pg.wait_for_timeout(100)
+    bb = pg.locator(".side-rz").bounding_box(); pg.mouse.move(bb["x"] + 4, bb["y"] + 200); pg.mouse.down(); pg.mouse.move(420, 300, steps=6); pg.mouse.up(); pg.wait_for_timeout(100)
+    sw = pg.evaluate("document.querySelector('.side').getBoundingClientRect().width"); pg.reload(); pg.wait_for_timeout(300); sw2 = pg.evaluate("document.querySelector('.side').getBoundingClientRect().width")
+    pg.dblclick(".side-rz"); sw3 = pg.evaluate("document.querySelector('.side').getBoundingClientRect().width")
+    check("본문 너비 보통→넓게→전체(편집도 같이)·왼쪽 메뉴 끌어서 넓히기", w1 > w0 and w2 >= w1 and "전체" in lbl and abs(we - w2) < 80 and 400 <= sw <= 440 and abs(sw2 - sw) < 2 and sw3 == 280, f"{w0},{w1},{w2},{lbl},{we},{sw},{sw2},{sw3}")
     check("자바스크립트 오류 없음", not errs, "; ".join(errs[:3]))
     b.close()
 srv.shutdown()
