@@ -1150,13 +1150,21 @@ function showMembers(){
       <button class="btn sm primary" data-ok="${esc(r.uid)}">승인</button><button class="btn sm" data-no="${esc(r.uid)}">거절</button></div>`).join("")}</div>` : `<p style="color:var(--muted)">새 요청이 없어요.</p>`}</div>
   <div class="sec"><h3>팀원 ${members.length}</h3>${members.length ? `<div class="plist">${members.map(m => `<div class="mrow"><span class="avatar" style="cursor:default">${esc(initials(m.name || m.email))}</span>
       <span class="pm"><b>${esc(m.name || m.email)}</b><small>${esc(m.email)} · ${ago(m.at)} 승인</small></span><button class="btn sm" data-rm="${esc(m.email)}">내보내기</button></div>`).join("")}</div>` : `<p style="color:var(--muted)">승인한 팀원이 아직 없어요. (규칙에 직접 적은 관리자는 여기 안 보여요)</p>`}</div></div>`;
-  main().querySelectorAll("[data-ok]").forEach(b => b.onclick = async () => { const r = reqs.find(x => x.uid === b.dataset.ok); if (!r) return;
-    if (r.provider !== "google.com" && !r.verified && !confirm(`${r.email}은(는) 아직 이메일 인증 전이에요. 승인해도 인증을 마쳐야 들어올 수 있어요. 승인할까요?`)) return;
-    try { const bt = fs.batch(); bt.set(fs.collection("wiki_members").doc(r.email.toLowerCase()), { name: r.name || "", at: Date.now(), by: me().email }); bt.delete(fs.collection("wiki_requests").doc(r.uid)); await bt.commit(); toast(`${r.name || r.email}님을 승인했어요`); } catch (ex) { toast(errMsg(ex)); } });
-  main().querySelectorAll("[data-no]").forEach(b => b.onclick = async () => { const r = reqs.find(x => x.uid === b.dataset.no); if (!r || !confirm(`${r.email}의 가입 요청을 거절할까요?`)) return;
-    try { await fs.collection("wiki_requests").doc(r.uid).delete(); toast("거절했어요"); } catch (ex) { toast(errMsg(ex)); } });
-  main().querySelectorAll("[data-rm]").forEach(b => b.onclick = async () => { if (!confirm(`${b.dataset.rm}을(를) 팀에서 내보낼까요? 다시 들어오려면 가입 요청부터 해야 해요.`)) return;
-    try { await fs.collection("wiki_members").doc(b.dataset.rm).delete(); toast("내보냈어요"); } catch (ex) { toast(errMsg(ex)); } });
+  const approve = async (r, b) => { if (b) { b.disabled = true; b.textContent = "승인 중…"; }
+    try { const bt = fs.batch(); bt.set(fs.collection("wiki_members").doc(r.email.toLowerCase()), { name: r.name || "", at: Date.now(), by: me().email }); bt.delete(fs.collection("wiki_requests").doc(r.uid)); await bt.commit(); toast(`${r.name || r.email}님을 승인했어요`); }
+    catch (ex) { if (b) { b.disabled = false; b.textContent = "승인"; } toast("승인하지 못했어요: " + (/permission/i.test(ex.code || "") ? "규칙에서 관리자 권한을 확인해 주세요" : (ex.code || ex.message || ""))); } };
+  main().querySelectorAll("[data-ok]").forEach(b => b.onclick = () => { const r = reqs.find(x => x.uid === b.dataset.ok); if (!r) return;
+    if (r.provider === "google.com" || r.verified) return approve(r, b);
+    modal(`<header><h2>승인할까요?</h2></header><div class="mb"><p><b>${esc(r.name || r.email)}</b> (${esc(r.email)})님은 아직 <b>이메일 인증 전</b>이에요.</p>
+      <p style="color:var(--muted);font-size:13px">지금 승인해 둬도 돼요. 본인이 메일함(스팸함 포함)에서 인증 링크를 누르면 그때부터 들어올 수 있어요.</p></div>
+      <footer><button class="btn subtle" data-close>취소</button><button class="btn primary" id="okYes">승인</button></footer>`);
+    $("#okYes").onclick = () => { closeModal(); approve(r, b); }; });
+  main().querySelectorAll("[data-no]").forEach(b => b.onclick = () => { const r = reqs.find(x => x.uid === b.dataset.no); if (!r) return;
+    modal(`<header><h2>거절할까요?</h2></header><div class="mb"><p>${esc(r.email)}의 가입 요청을 지워요.</p></div><footer><button class="btn subtle" data-close>취소</button><button class="btn danger" id="noYes">거절</button></footer>`);
+    $("#noYes").onclick = async () => { closeModal(); try { await fs.collection("wiki_requests").doc(r.uid).delete(); toast("거절했어요"); } catch (ex) { toast(errMsg(ex)); } }; });
+  main().querySelectorAll("[data-rm]").forEach(b => b.onclick = () => {
+    modal(`<header><h2>내보낼까요?</h2></header><div class="mb"><p>${esc(b.dataset.rm)}을(를) 팀에서 내보내요. 다시 들어오려면 가입 요청부터 해야 해요.</p></div><footer><button class="btn subtle" data-close>취소</button><button class="btn danger" id="rmYes">내보내기</button></footer>`);
+    $("#rmYes").onclick = async () => { closeModal(); try { await fs.collection("wiki_members").doc(b.dataset.rm).delete(); toast("내보냈어요"); } catch (ex) { toast(errMsg(ex)); } }; });
 }
 function bootLocal(){ mode = "local"; showApp(); loadLocal(); }
 wireChrome();
