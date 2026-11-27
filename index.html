@@ -256,6 +256,11 @@ input:focus,textarea:focus,select:focus{border-color:var(--brand)}
 .mrow{display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--line2)}
 .mrow:last-child{border-bottom:0}
 .mrow .pm{flex:1;min-width:0} .mrow .pm b{display:block;font-weight:500} .mrow .pm small{color:var(--muted);font-size:12px}
+.sgate{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--line);border-radius:6px;margin:0 0 24px;background:var(--ok)}
+.sgate.closed{background:var(--err)}
+.sgate .sdot{width:10px;height:10px;border-radius:50%;background:var(--ok-b);flex:none}
+.sgate.closed .sdot{background:var(--err-b)}
+.sgate .pm{flex:1;min-width:0} .sgate .pm b{display:block} .sgate .pm small{color:var(--sub);font-size:12px}
 .mtoggle{display:none}
 @media (max-width:900px){
   .side{transform:translateX(-100%);transition:transform .2s;box-shadow:var(--shadow)}
@@ -1040,7 +1045,7 @@ function showGate(msg, tab){
   gateCard(`<div class="gtabs"><button type="button" data-gt="login" class="${su ? "" : "on"}">로그인</button><button type="button" data-gt="signup" class="${su ? "on" : ""}">가입 요청</button></div>
     ${su ? `<p>계정을 만들어 요청을 보내면, 관리자가 위키에서 확인하고 승인해요. 승인되면 바로 들어올 수 있어요.</p>` : `<p>팀원만 볼 수 있는 위키예요.</p>`}
     ${msg ? `<div class="err" style="margin-bottom:12px">${esc(msg)}</div>` : ""}
-    ${su ? `<form id="sForm"><input id="sName" placeholder="이름 (팀에서 부르는 이름)" maxlength="30" required><input id="sEm" type="email" placeholder="이메일" autocomplete="username" required>
+    ${su && signupClosed ? `<div class="gstep">🔒 ${CLOSED_MSG}</div>` : su ? `<form id="sForm"><input id="sName" placeholder="이름 (팀에서 부르는 이름)" maxlength="30" required><input id="sEm" type="email" placeholder="이메일" autocomplete="username" required>
         <input id="sPw" type="password" placeholder="비밀번호 (6자 이상)" minlength="6" autocomplete="new-password" required><button class="btn primary" type="submit" id="sBtn">가입 요청 보내기</button></form>
         <div class="or">또는</div><button class="btn" id="gGoogle" style="background:var(--panel);border:1px solid var(--line)">G&nbsp; 구글 계정으로 요청하기</button>`
     : `<button class="btn" id="gGoogle" style="background:var(--panel);border:1px solid var(--line)">G&nbsp; 구글 계정으로 로그인</button>
@@ -1049,16 +1054,16 @@ function showGate(msg, tab){
     <button class="btn primary" type="submit">로그인</button></form>
     <p style="font-size:12px;margin:14px 0 0">처음이면 위 <b>가입 요청</b>에서 계정을 만드세요. 회사망에서 구글 로그인이 막히면 이메일을 쓰세요.</p>`}`);
   $("#gate").querySelectorAll("[data-gt]").forEach(b => b.onclick = () => showGate("", b.dataset.gt));
-  $("#gGoogle").onclick = async () => { try { await auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()); } catch (ex) { showGate(/popup|blocked|network/i.test(ex.code || "") ? "구글 로그인 창이 막혔어요. 이메일을 써 보세요" : "로그인하지 못했어요", tab); } };
+  if ($("#gGoogle")) $("#gGoogle").onclick = async () => { try { await auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()); } catch (ex) { showGate(/popup|blocked|network/i.test(ex.code || "") ? "구글 로그인 창이 막혔어요. 이메일을 써 보세요" : "로그인하지 못했어요", tab); } };
   if (!su) $("#gForm").onsubmit = async e => { e.preventDefault(); try { await auth.signInWithEmailAndPassword($("#gEm").value.trim(), $("#gPw").value); } catch { showGate("이메일이나 비밀번호가 맞지 않아요"); } };
-  else $("#sForm").onsubmit = async e => { e.preventDefault(); const btn = $("#sBtn"); btn.disabled = true; btn.textContent = "보내는 중…";
+  else if ($("#sForm")) $("#sForm").onsubmit = async e => { e.preventDefault(); const btn = $("#sBtn"); btn.disabled = true; btn.textContent = "보내는 중…";
     const name = $("#sName").value.trim(), em = $("#sEm").value.trim(), pw = $("#sPw").value;
     signingUp = true; let cr = null;
     try {
       cr = await auth.createUserWithEmailAndPassword(em, pw);
       await cr.user.updateProfile({ displayName: name });
       const ok = await sendRequest(cr.user, name);
-      if (!ok) { gateMsg = [`오늘 가입 요청이 가득 찼어요 (하루 ${DAY_MAX}명까지). 내일 다시 시도해 주세요.`, "signup"]; signingUp = false; await cr.user.delete().catch(() => auth.signOut()); return; }
+      if (ok !== true) { gateMsg = [ok === "closed" ? CLOSED_MSG : `오늘 가입 요청이 가득 찼어요 (하루 ${DAY_MAX}명까지). 내일 다시 시도해 주세요.`, "signup"]; signingUp = false; await cr.user.delete().catch(() => auth.signOut()); return; }
       cr.user.sendEmailVerification().catch(() => {});
       signingUp = false; showPending(cr.user, true);
     } catch (ex) { const c = String(ex.code || ex.message || "");
@@ -1071,9 +1076,13 @@ function showGate(msg, tab){
       signingUp = false; showGate(msg, "signup"); }
   };
 }
-let signingUp = false, gateMsg = null;
+let signingUp = false, gateMsg = null, signupClosed = false;
+const SETTINGS = () => fs.collection("wiki_meta").doc("settings");
+async function loadSettings(){ try { const d = await SETTINGS().get(); signupClosed = !!(d.exists && d.data().signupClosed); } catch {} return signupClosed; }
+const CLOSED_MSG = "지금은 가입 신청을 받지 않아요. 관리자에게 문의해 주세요.";
 /* 가입 요청: 하루 DAY_MAX개 넘으면 막음, 관리자 확인 메일(EmailJS 설정이 있을 때) */
 async function sendRequest(u, name){
+  if (await loadSettings()) return "closed";
   const meta = fs.collection("wiki_meta").doc("signup"), d = today();
   const ok = await fs.runTransaction(async tx => { const snap = await tx.get(meta), cur = snap.exists ? snap.data() : {};
     const n = cur.day === d ? (cur.count || 0) : 0; if (n >= DAY_MAX) return false;
@@ -1094,10 +1103,11 @@ async function showPending(u, fresh){
   try { await u.reload(); } catch {}
   const pw = (u.providerData[0] || {}).providerId === "password";
   if (req && pw && u.emailVerified && !req.verified) fs.collection("wiki_requests").doc(u.uid).update({ verified: true }).catch(() => {});
+  if (!req && signupClosed) { gateCard(`<h1>아직 팀원이 아니에요</h1><p>${esc(u.email)} 계정은 위키 권한이 없어요.</p><div class="gstep">🔒 ${CLOSED_MSG}</div><button class="btn" id="pOut">다른 계정으로 로그인</button>`); $("#pOut").onclick = () => auth.signOut(); return; }
   if (!req) {
     gateCard(`<h1>아직 팀원이 아니에요</h1><p>${esc(u.email)} 계정은 위키 권한이 없어요. 가입 요청을 보내면 관리자가 확인해요.</p>
       <button class="btn primary" id="pReq">가입 요청 보내기</button><div style="height:8px"></div><button class="btn" id="pOut">다른 계정으로 로그인</button>`);
-    $("#pReq").onclick = async () => { $("#pReq").disabled = true; try { const ok = await sendRequest(u, u.displayName || ""); if (!ok) { gateCard(`<h1>가입이 막혔어요</h1><p>오늘 가입 요청이 가득 찼어요 (하루 ${DAY_MAX}명까지). 내일 다시 시도해 주세요.</p><button class="btn" id="pOut">로그아웃</button>`); $("#pOut").onclick = () => auth.signOut(); return; } showPending(u, true); } catch { toast("요청을 보내지 못했어요"); $("#pReq").disabled = false; } };
+    $("#pReq").onclick = async () => { $("#pReq").disabled = true; try { const ok = await sendRequest(u, u.displayName || ""); if (ok !== true) { gateCard(`<h1>가입이 막혔어요</h1><p>${ok === "closed" ? CLOSED_MSG : `오늘 가입 요청이 가득 찼어요 (하루 ${DAY_MAX}명까지). 내일 다시 시도해 주세요.`}</p><button class="btn" id="pOut">로그아웃</button>`); $("#pOut").onclick = () => auth.signOut(); return; } showPending(u, true); } catch { toast("요청을 보내지 못했어요"); $("#pReq").disabled = false; } };
     $("#pOut").onclick = () => auth.signOut(); return;
   }
   gateCard(`<h1>${fresh ? "가입 요청을 보냈어요" : "승인을 기다리는 중이에요"}</h1>
@@ -1118,6 +1128,7 @@ async function bootCloud(){
   await loadScript(FB + "firebase-app-compat.js");
   await Promise.all([loadScript(FB + "firebase-firestore-compat.js"), loadScript(FB + "firebase-auth-compat.js")]);
   firebase.initializeApp(CFG.firebase); fs = firebase.firestore(); auth = firebase.auth(); mode = "cloud";
+  await loadSettings();
   auth.onAuthStateChanged(u => {
     user = u; if (unsub) { unsub(); unsub = null; } ready = false;
     if (!u) { isAdmin = false; if (unsubReq) { unsubReq(); unsubReq = null; } const gm = gateMsg; gateMsg = null; showGate(gm ? gm[0] : "", gm ? gm[1] : ""); return; }
@@ -1145,11 +1156,16 @@ function showMembers(){
   const ago = t => when(t);
   main().innerHTML = `<div class="pagehd"><div class="crumbs"><a href="#/">${esc(SPACE)}</a><span class="sep">/</span><span>팀원 관리</span></div></div>
   <div class="content"><h1 class="ptitle">팀원 관리</h1><div class="byline">가입 요청을 승인하면 바로 위키에 들어올 수 있어요. 하루 가입 요청은 ${DAY_MAX}개까지 받아요.</div>
+  <div class="sgate ${signupClosed ? "closed" : ""}"><span class="sdot"></span><span class="pm"><b>${signupClosed ? "가입 신청 막힘" : "가입 신청 받는 중"}</b><small>${signupClosed ? "새 가입 신청을 받지 않아요. 이미 들어온 요청은 승인할 수 있어요." : "누구나 로그인 화면에서 가입 요청을 보낼 수 있어요."}</small></span>
+    <button class="btn sm ${signupClosed ? "primary" : "danger"}" id="sgToggle">${signupClosed ? "가입 다시 받기" : "가입 막기"}</button></div>
   <div class="sec"><h3>가입 요청 ${reqs.length}</h3>${reqs.length ? `<div class="plist">${reqs.map(r => `<div class="mrow"><span class="avatar" style="cursor:default">${esc(initials(r.name || r.email))}</span>
       <span class="pm"><b>${esc(r.name || "(이름 없음)")}</b><small>${esc(r.email)} · ${ago(r.at)} · ${r.provider === "google.com" ? "구글 계정" : r.verified ? "이메일 인증됨" : "이메일 인증 전"}</small></span>
       <button class="btn sm primary" data-ok="${esc(r.uid)}">승인</button><button class="btn sm" data-no="${esc(r.uid)}">거절</button></div>`).join("")}</div>` : `<p style="color:var(--muted)">새 요청이 없어요.</p>`}</div>
   <div class="sec"><h3>팀원 ${members.length}</h3>${members.length ? `<div class="plist">${members.map(m => `<div class="mrow"><span class="avatar" style="cursor:default">${esc(initials(m.name || m.email))}</span>
       <span class="pm"><b>${esc(m.name || m.email)}</b><small>${esc(m.email)} · ${ago(m.at)} 승인</small></span><button class="btn sm" data-rm="${esc(m.email)}">내보내기</button></div>`).join("")}</div>` : `<p style="color:var(--muted)">승인한 팀원이 아직 없어요. (규칙에 직접 적은 관리자는 여기 안 보여요)</p>`}</div></div>`;
+  $("#sgToggle").onclick = async () => { const next = !signupClosed, b = $("#sgToggle"); b.disabled = true;
+    try { await SETTINGS().set({ signupClosed: next, at: Date.now(), by: me().email }, { merge: true }); signupClosed = next; toast(next ? "가입 신청을 막았어요" : "가입 신청을 다시 받아요"); showMembers(); }
+    catch (ex) { b.disabled = false; toast("바꾸지 못했어요: " + (/permission/i.test(ex.code || "") ? "Firestore 규칙에 wiki_meta/settings 부분을 넣어 주세요" : (ex.code || ""))); } };
   const approve = async (r, b) => { if (b) { b.disabled = true; b.textContent = "승인 중…"; }
     try { const bt = fs.batch(); bt.set(fs.collection("wiki_members").doc(r.email.toLowerCase()), { name: r.name || "", at: Date.now(), by: me().email }); bt.delete(fs.collection("wiki_requests").doc(r.uid)); await bt.commit(); toast(`${r.name || r.email}님을 승인했어요`); }
     catch (ex) { if (b) { b.disabled = false; b.textContent = "승인"; } toast("승인하지 못했어요: " + (/permission/i.test(ex.code || "") ? "규칙에서 관리자 권한을 확인해 주세요" : (ex.code || ex.message || ""))); } };
