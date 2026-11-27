@@ -813,13 +813,38 @@ function route(force){
   if (r.v === "search") return showSearch(r.q);
   return showHome();
 }
+/* 화면 안 창 (브라우저 confirm·prompt가 막힌 곳이 있어서 안 씀) */
+function askModal(title, msg, okLabel, onOk, danger){
+  modal(`<header><h2>${esc(title)}</h2></header><div class="mb"><p style="margin:0">${msg}</p></div>
+    <footer><button class="btn subtle" data-close>취소</button><button class="btn ${danger ? "danger" : "primary"}" id="askOk">${esc(okLabel)}</button></footer>`);
+  $("#askOk").onclick = () => { closeModal(); onOk(); }; $("#askOk").focus();
+}
+function askText(title, value, onOk, placeholder){
+  modal(`<header><h2>${esc(title)}</h2></header><div class="mb"><input id="askIn" style="width:100%" value="${esc(value || "")}" placeholder="${esc(placeholder || "")}"></div>
+    <footer><button class="btn subtle" data-close>취소</button><button class="btn primary" id="askOk">확인</button></footer>`);
+  const i = $("#askIn"), ok = () => { const v = i.value; closeModal(); onOk(v); };
+  $("#askOk").onclick = ok; i.addEventListener("keydown", e => { if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); ok(); } }); i.focus(); i.select();
+}
+function saveDraftNow(){ if (ed && editing && editDirty()) localStorage.setItem(draftKey(editing.id), JSON.stringify({ title: edTitle.value, html: ed.innerHTML, at: Date.now() })); }
+function askLeave(go){
+  askModal("저장하지 않은 내용이 있어요", "나가도 이 브라우저에 임시 저장돼서, 다시 편집을 열면 <b>불러오기</b>로 되살릴 수 있어요.", "나가기", () => { saveDraftNow(); go(); });
+}
+let leaving = false;
 window.addEventListener("hashchange", () => {
-  if (editing && editDirty() && !location.hash.endsWith("/edit")) {
-    if (!confirm("저장하지 않은 내용이 있어요. 나갈까요? (임시 저장은 남아 있어요)")) { history.replaceState(null, "", lastRoute); return; }
+  if (!leaving && editing && editDirty() && !location.hash.endsWith("/edit")) {
+    const target = location.hash; history.replaceState(null, "", lastRoute);
+    askLeave(() => { leaving = true; stopEdit(); location.hash = target; });
+    return;
   }
+  leaving = false;
   if (editing && !location.hash.endsWith("/edit")) stopEdit();
   route();
 });
+function goTo(h){ /* 같은 주소여도 다시 열기 (편집 중 '만들기' 등) */
+  if (location.hash !== h) { location.hash = h; return; }
+  const fire = () => { stopEdit(); route(true); };
+  editing && editDirty() ? askLeave(fire) : fire();
+}
 window.addEventListener("beforeunload", e => { if (editing && editDirty()) { e.preventDefault(); e.returnValue = ""; } });
 
 /* ───────── 페이지 트리 ───────── */
@@ -842,7 +867,7 @@ function wireTree(){
   const tr = $("#tree");
   tr.addEventListener("click", e => {
     const tw = e.target.closest("[data-tw]"); if (tw) { const id = tw.dataset.tw; open.has(id) ? open.delete(id) : open.add(id); saveOpen(); renderTree(); return; }
-    const ad = e.target.closest("[data-tadd]"); if (ad) { open.add(ad.dataset.tadd); saveOpen(); location.hash = "#/new/" + ad.dataset.tadd; return; }
+    const ad = e.target.closest("[data-tadd]"); if (ad) { open.add(ad.dataset.tadd); saveOpen(); goTo("#/new/" + ad.dataset.tadd); return; }
     const mo = e.target.closest("[data-tmore]"); if (mo) { pageMenu(mo.dataset.tmore, mo); return; }
     const row = e.target.closest("[data-row]"); if (row) location.hash = "#/p/" + row.dataset.row;
   });
@@ -884,7 +909,7 @@ function pageMenu(id, anchor, x, y){
   showMenu([
     { label: "열기", run: () => location.hash = "#/p/" + id },
     { label: "편집", run: () => location.hash = "#/p/" + id + "/edit" },
-    { label: "하위 페이지 만들기", run: () => { open.add(id); saveOpen(); location.hash = "#/new/" + id; } },
+    { label: "하위 페이지 만들기", run: () => { open.add(id); saveOpen(); goTo("#/new/" + id); } },
     { label: "복제", run: () => duplicatePage(id) },
     { label: "링크 복사", run: () => copyLink(id) },
     "-",
@@ -895,7 +920,7 @@ function pageMenu(id, anchor, x, y){
   ], anchor, x, y);
 }
 function nudge(id, d){ const p = byId(id), s = kids(p.parent || null), i = s.findIndex(x => x.id === id), j = i + d; if (j < 0 || j >= s.length) return; movePage(id, p.parent || null, s[j].id, d > 0); }
-function copyLink(id){ const u = location.href.split("#")[0] + "#/p/" + id; (navigator.clipboard ? navigator.clipboard.writeText(u) : Promise.reject()).then(() => toast("링크를 복사했어요"), () => prompt("링크", u)); }
+function copyLink(id){ const u = location.href.split("#")[0] + "#/p/" + id; (navigator.clipboard ? navigator.clipboard.writeText(u) : Promise.reject()).then(() => toast("링크를 복사했어요"), () => askText("이 주소를 복사하세요", u, () => {})); }
 async function duplicatePage(id){
   const p = byId(id); if (!p) return; const nid = uid(), t = Date.now(), m = me();
   const sibs = kids(p.parent || null), i = sibs.findIndex(x => x.id === id);
@@ -931,7 +956,7 @@ function showHome(){
       <div class="sec"><h3>최상위 페이지</h3><div class="plist">${roots.map(pageRow).join("")}</div></div>`
       : `<div class="empty"><b>첫 페이지를 만들어 보세요</b>회의록, 기획서, 규칙 정리… 무엇이든 페이지로 만들고 트리로 묶을 수 있어요.</div>`}
   </div>`;
-  $("#hNew").onclick = () => location.hash = "#/new";
+  $("#hNew").onclick = () => goTo("#/new");
 }
 function showRecent(){
   renderTree(); document.title = "최근 수정 · " + SPACE;
@@ -1012,7 +1037,7 @@ function showPage(id){
   $("#pMore").onclick = e => showMenu([
     { label: "수정 기록", run: () => showHistory(id) },
     { label: full ? "고정 너비로 보기" : "전체 너비로 보기", run: () => { localStorage.setItem("wiki-full", full ? "0" : "1"); showPage(id); } },
-    { label: "하위 페이지 만들기", run: () => { open.add(id); saveOpen(); location.hash = "#/new/" + id; } },
+    { label: "하위 페이지 만들기", run: () => { open.add(id); saveOpen(); goTo("#/new/" + id); } },
     { label: "복제", run: () => duplicatePage(id) },
     { label: "링크 복사", run: () => copyLink(id) },
     "-", { label: "삭제", danger: true, run: () => deletePage(id) }], e.currentTarget);
@@ -1028,7 +1053,7 @@ async function loadComments(id){
   box.style.cssText = ""; box.innerHTML = list.length ? list.map(c => `<div class="cmt"><span class="avatar">${esc(initials(c.by && c.by.name))}</span><div class="cb">
     <div class="cm"><b>${esc((c.by && c.by.name) || "")}</b>${when(c.at)}</div><div class="ct">${esc(c.text)}</div>
     ${(!mine || (c.by && c.by.email === mine)) ? `<button class="cx" data-cdel="${esc(c.id)}">삭제</button>` : ""}</div></div>`).join("") : `<p style="color:var(--muted);font-size:13px;margin:0 0 14px">첫 댓글을 남겨 보세요.</p>`;
-  box.querySelectorAll("[data-cdel]").forEach(b => b.onclick = async () => { if (!confirm("댓글을 지울까요?")) return; try { await store.delComment(b.dataset.cdel); loadComments(id); } catch (ex) { toast(errMsg(ex)); } });
+  box.querySelectorAll("[data-cdel]").forEach(b => b.onclick = async () => { askModal("댓글 지우기", "이 댓글을 지울까요?", "지우기", async () => { try { await store.delComment(b.dataset.cdel); loadComments(id); } catch (ex) { toast(errMsg(ex)); } }, true); });
 }
 async function addComment(id){
   const t = $("#cIn"), v = t.value.trim(); if (!v) return;
@@ -1168,8 +1193,9 @@ function wireEditor(id, isNew){
         const d = document.createElement("div"); d.className = "panel " + k; const p = document.createElement("p");
         if (b && b.nodeType === 1 && b.tagName === "P" && b.textContent.trim()) { p.innerHTML = b.innerHTML; d.appendChild(p); b.replaceWith(d); const r = document.createRange(); r.selectNodeContents(p); r.collapse(false); getSelection().removeAllRanges(); getSelection().addRange(r); }
         else { p.innerHTML = "<br>"; d.appendChild(p); insertBlock(d, p); } } }))], btn); }
-    else if (a === "link") { const s = getSelection(); const txt = s.toString(); const u = prompt("링크 주소 (https://…)", "https://"); if (!u || !/^(https?:|mailto:)/i.test(u)) return; restoreSel();
-      if (txt) document.execCommand("createLink", false, u); else document.execCommand("insertHTML", false, `<a href="${esc(u)}">${esc(u)}</a>&nbsp;`); }
+    else if (a === "link") { const s = getSelection(); const txt = s.toString(); saveSel();
+      askText("링크 주소", "https://", u => { u = (u || "").trim(); if (!/^(https?:|mailto:)/i.test(u)) { if (u && u !== "https://") toast("https:// 로 시작하는 주소를 넣어 주세요"); ed.focus(); restoreSel(); return; }
+        ed.focus(); restoreSel(); if (txt) document.execCommand("createLink", false, u); else document.execCommand("insertHTML", false, `<a href="${esc(u)}">${esc(u)}</a>&nbsp;`); }, "https://…"); }
     else if (a === "plink") openPicker("");
     else if (a === "image") $("#edFile").click();
   }
@@ -1190,13 +1216,13 @@ function wireEditor(id, isNew){
     if (S && !A) {
       const f = { Digit7: () => listToggle("ol"), Digit8: () => listToggle("ul"), Digit9: () => setBlock("blockquote"), KeyS: () => document.execCommand("strikeThrough"),
         KeyM: inlineCode, Comma: () => document.execCommand("subscript"), Period: () => document.execCommand("superscript"), KeyL: () => setAlign(""), KeyI: () => act("table"),
-        Enter: doSave, NumpadEnter: doSave, Slash: showKeys }[c];
+        Enter: () => doSave(), NumpadEnter: () => doSave(), Slash: showKeys }[c];
       return f ? run(f) : false;
     }
     if (!A && !S) {
       if (c === "KeyK") return run(() => act("link"));
       if (c === "KeyM") return run(() => $("#edFile").click());
-      if (c === "Enter" || c === "NumpadEnter") return run(doSave);
+      if (c === "Enter" || c === "NumpadEnter") return run(() => doSave());
       if (c === "Slash") return run(showKeys);
       if (c === "KeyZ" && autoUndo) return run(undoAuto);
     }
@@ -1254,12 +1280,12 @@ function wireEditor(id, isNew){
     const pos = document.caretRangeFromPoint ? document.caretRangeFromPoint(e.clientX, e.clientY) : null; if (pos) { getSelection().removeAllRanges(); getSelection().addRange(pos); } saveSel(); uploadFiles(files); });
   edTitle.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); ed.focus(); const r = document.createRange(); r.setStart(ed.firstChild || ed, 0); getSelection().removeAllRanges(); getSelection().addRange(r); } });
   /* 저장 */
-  const doSave = async () => {
+  const doSave = async force => {
     if (ed.querySelector(".uping")) { toast("이미지 올리기가 끝나면 저장할 수 있어요"); return; }
     const title = edTitle.value.trim(); if (!title) { toast("제목을 입력해 주세요"); edTitle.focus(); return; }
     const p = byId(id);
     if (!isNew && p && editing && p.updatedAt && editing.base && p.updatedAt > editing.base && p.updatedBy && p.updatedBy.email !== me().email) {
-      if (!confirm(`${p.updatedBy.name}님이 편집하는 동안 이 페이지를 먼저 수정했어요.\n그대로 저장하면 그 내용 위에 덮어써요. (그 버전은 수정 기록에 남아요)\n저장할까요?`)) return; }
+      if (force !== true) { askModal("먼저 수정한 사람이 있어요", `${esc(p.updatedBy.name)}님이 편집하는 동안 이 페이지를 먼저 수정했어요.<br>그대로 저장하면 그 내용 위에 덮어써요. (그 버전은 수정 기록에 남아요)`, "덮어써서 저장", () => doSave(true), true); return; } }
     const btn = $("#edSave"); btn.disabled = true; $("#edstate").textContent = "저장 중…";
     try {
       const html = ed.innerHTML;
@@ -1270,8 +1296,9 @@ function wireEditor(id, isNew){
       location.hash = "#/p/" + id; route(true);
     } catch (ex) { btn.disabled = false; $("#edstate").textContent = ""; toast(errMsg(ex)); }
   };
-  $("#edSave").onclick = doSave;
-  $("#edCancel").onclick = () => { if (editDirty() && !confirm("저장하지 않은 내용이 있어요. 닫을까요? (임시 저장은 남아 있어요)")) return; const was = editing; stopEdit(); location.hash = was && !was.isNew ? "#/p/" + id : (was && was.parent ? "#/p/" + was.parent : "#/"); route(true); };
+  $("#edSave").onclick = () => doSave();
+  $("#edCancel").onclick = () => { const close = () => { const was = editing; stopEdit(); location.hash = was && !was.isNew ? "#/p/" + id : (was && was.parent ? "#/p/" + was.parent : "#/"); route(true); };
+    editDirty() ? askLeave(close) : close(); };
   main().addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.code === "KeyS") { e.preventDefault(); doSave(); } });
 }
 /* 그림 선택: 크기·삭제 */
@@ -1286,7 +1313,7 @@ function selectFig(f){
   bar.addEventListener("mousedown", e => e.preventDefault());
   bar.onclick = e => { const b = e.target.closest("button"); if (!b) return;
     if (b.dataset.w) { f.classList.remove("w-s", "w-m"); if (b.dataset.w !== "l") f.classList.add("w-" + b.dataset.w); }
-    else if (b.hasAttribute("data-cap")) { let c = f.querySelector("figcaption"); const v = prompt("이미지 설명", c ? c.textContent : ""); if (v === null) return; if (!c) { c = document.createElement("figcaption"); f.appendChild(c); } c.textContent = v; if (!v) c.remove(); }
+    else if (b.hasAttribute("data-cap")) { let c = f.querySelector("figcaption"); askText("이미지 설명", c ? c.textContent : "", v => { if (!c) { c = document.createElement("figcaption"); f.appendChild(c); } c.textContent = v; if (!v) c.remove(); }); return; }
     else if (b.hasAttribute("data-del")) { f.remove(); selFigEl = null; bar.remove(); return; }
     selectFig(f); };
 }
@@ -1422,8 +1449,8 @@ function paintTheme(){ const b = $("#themeBtn"); if (b) { b.textContent = isDark
 function wireChrome(){
   $("#logoName").textContent = SPACE; $("#spaceName").textContent = SPACE; $("#spaceIcon").textContent = initials(SPACE);
   $("#themeBtn").onclick = () => { const n = isDark() ? "light" : "dark"; document.documentElement.dataset.theme = n; localStorage.setItem("wiki-theme", n); paintTheme(); }; paintTheme();
-  $("#createBtn").onclick = () => { const r = parseHash(), p = r.v === "page" ? byId(r.id) : null; location.hash = "#/new" + (p && p.parent ? "/" + p.parent : ""); };
-  $("#addRoot").onclick = () => location.hash = "#/new";
+  $("#createBtn").onclick = () => { const r = parseHash(), p = r.v === "page" ? byId(r.id) : null; goTo("#/new" + (p && p.parent ? "/" + p.parent : "")); };
+  $("#addRoot").onclick = () => goTo("#/new");
   $("#navBtn").onclick = () => document.body.classList.toggle("navopen");
   $("#meBtn").onclick = e => showMenu([{ head: user ? (user.displayName ? user.displayName + " · " : "") + (user.email || "") : "이 브라우저에만 저장 중" },
     ...(user ? [{ label: "로그아웃", run: () => auth.signOut() }] : [])], e.currentTarget);

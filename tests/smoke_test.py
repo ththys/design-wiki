@@ -68,7 +68,7 @@ with sync_playwright() as p:
     # 4) 댓글
     pg.fill("#cIn", "좋아요 확인했어요"); pg.click("#cAdd"); pg.wait_for_timeout(300)
     check("댓글 등록", "좋아요 확인했어요" in pg.inner_text("#cmtList"))
-    pg.once("dialog", lambda d: d.accept()); pg.click("[data-cdel]"); pg.wait_for_timeout(300)
+    pg.click("[data-cdel]"); pg.wait_for_timeout(100); pg.click("#askOk"); pg.wait_for_timeout(300)
     check("댓글 삭제", "좋아요 확인했어요" not in pg.inner_text("#cmtList"))
 
     # 5) 검색
@@ -92,8 +92,9 @@ with sync_playwright() as p:
     pg.click("#ed"); pg.keyboard.press("End"); type_ko(pg, "임시 글"); pg.wait_for_timeout(4300)
     draft = pg.evaluate(f"!!localStorage.getItem('wiki-draft:{pid}')")
     check("4초마다 임시 저장", draft)
-    pg.once("dialog", lambda d: d.dismiss()); pg.click("#edCancel"); pg.wait_for_timeout(200)
-    check("저장 안 하고 닫으면 묻기", pg.locator("#ed").count() == 1)
+    pg.click("#edCancel"); pg.wait_for_timeout(200); asked = pg.locator("#askOk").count() == 1
+    pg.click("[data-close]"); pg.wait_for_timeout(100)
+    check("저장 안 하고 닫으면 묻기 (화면 안 창)", asked and pg.locator("#ed").count() == 1)
 
     # 8) 패널 · / 명령
     pg.evaluate("document.querySelector('#ed').innerHTML='<ul class=\"check\"><li>할 일</li></ul><p><br></p>'")
@@ -184,6 +185,17 @@ with sync_playwright() as p:
     pg.mouse.click(5, 300); pg.keyboard.press("Shift+Slash"); pg.wait_for_timeout(100); keys = pg.locator(".keys .ours").count() == 1
     pg.keyboard.press("Escape"); pg.keyboard.press("BracketLeft"); side = pg.evaluate("document.body.classList.contains('sidehide')"); pg.keyboard.press("BracketLeft")
     check("? 단축키 창 · [ 왼쪽 메뉴 접기", keys and side, f"{keys},{side}")
+
+    # 14) 편집 중 로고·만들기 누르기 (브라우저 확인창 없이)
+    pg.goto(URL + "#/"); pg.wait_for_timeout(150); pg.goto(URL + "#/new"); pg.wait_for_timeout(250)
+    pg.fill("#edTitle", "쓰다 만 글"); pg.click("#ed"); pg.keyboard.type("내용")
+    pg.click(".logo"); pg.wait_for_timeout(150); asked = pg.locator("#askOk").count() == 1
+    pg.click("#askOk"); pg.wait_for_timeout(250); home = pg.locator("#ed").count() == 0 and pg.evaluate("location.hash") in ("#/", "")
+    pg.click("#createBtn"); pg.wait_for_timeout(200); pg.fill("#edTitle", "두 번째"); pg.click("#ed"); pg.keyboard.type("글")
+    pg.click("#createBtn"); pg.wait_for_timeout(150); asked2 = pg.locator("#askOk").count() == 1; pg.click("#askOk"); pg.wait_for_timeout(250)
+    blank = pg.input_value("#edTitle") == "" and pg.locator("#ed").count() == 1
+    pg.click(".logo"); pg.wait_for_timeout(250); clean_home = pg.locator("#ed").count() == 0
+    check("편집 중 로고·만들기 → 화면 안 창으로 묻고 이동", asked and home and asked2 and blank and clean_home, f"{asked},{home},{asked2},{blank},{clean_home}")
     check("자바스크립트 오류 없음", not errs, "; ".join(errs[:3]))
     b.close()
 srv.shutdown()

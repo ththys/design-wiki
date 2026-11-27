@@ -162,7 +162,7 @@
 
 - 저장소 생성·Pages 켜기 API는 이 환경에서 막혀 있었음 → 사용자가 직접 만들고 Settings → Pages에서 켬. (사용자가 `settings/page`로 잘못 들어가 404를 본 적 있음 → 정확한 주소 `…/settings/pages`)
 - `contenteditable`에서 Enter 후 새 줄이 `<div>`로 생겨 빠른 서식이 안 먹음 → `defaultParagraphSeparator`를 `p`로.
-- 브라우저 `confirm()`이 막혀 승인 버튼이 반응 없었음 → 화면 안 창(`modal()`)으로 바꿈. 새로 확인창이 필요하면 `confirm()` 말고 `modal()`.
+- 브라우저 `confirm()`·`prompt()`가 사용자 브라우저에서 막혀 있음 → 승인 버튼, 편집 중 로고·만들기(이동이 조용히 취소됨), 링크·그림 설명 입력이 안 됐음. 전부 화면 안 창(`askModal()`, `askText()`, `modal()`)으로 바꿈. **`confirm()`·`prompt()`·`alert()`는 절대 쓰지 말 것.**
 - 가입 도중 실패하면 Auth 계정만 남는 문제 → 실패 시 `user.delete()`, 다시 시도 가능.
 - 처음 가입 흐름 중 일부 경로는 인증 메일을 안 보내 팀원이 막힘 → 인증 단계 자체를 없앰.
 
