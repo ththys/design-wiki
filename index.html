@@ -246,6 +246,16 @@ input:focus,textarea:focus,select:focus{border-color:var(--brand)}
 .gate input{width:100%;margin-bottom:8px}
 .gate .btn{width:100%;justify-content:center;height:40px}
 
+.gtabs{display:flex;gap:4px;margin:16px 0 4px;border-bottom:2px solid var(--line)}
+.gtabs button{border:0;background:none;padding:8px 12px;margin-bottom:-2px;border-bottom:2px solid transparent;cursor:pointer;font-weight:600;color:var(--muted)}
+.gtabs button.on{color:var(--brand);border-color:var(--brand)}
+.gstep{padding:10px 12px;border-radius:4px;background:var(--hover);margin-bottom:8px;font-size:13px}
+.gstep.done{background:var(--ok);color:var(--ink)}
+.nbadge{margin-left:auto;background:var(--danger);color:#fff;border-radius:10px;font-size:11px;font-weight:700;padding:0 6px;line-height:18px}
+.nbadge:empty{display:none}
+.mrow{display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--line2)}
+.mrow:last-child{border-bottom:0}
+.mrow .pm{flex:1;min-width:0} .mrow .pm b{display:block;font-weight:500} .mrow .pm small{color:var(--muted);font-size:12px}
 .mtoggle{display:none}
 @media (max-width:900px){
   .side{transform:translateX(-100%);transition:transform .2s;box-shadow:var(--shadow)}
@@ -279,6 +289,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--brand)}
     <div class="space"><i id="spaceIcon">D</i><div><b id="spaceName">디자인 위키</b><small>팀 공간</small></div></div>
     <nav class="snav">
       <a href="#/" data-nav="home"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11 12 3l9 8v10H3z"/></svg>개요</a>
+      <a href="#/members" data-nav="members" id="navMembers" hidden><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14.8c1.9.8 3.1 2.6 3.5 5.2"/></svg>팀원 관리<span class="nbadge" id="nReq"></span></a>
       <a href="#/recent" data-nav="recent"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>최근 수정</a>
     </nav>
     <div class="shead"><span>페이지</span><button class="ibtn" id="addRoot" type="button" title="최상위 페이지 만들기" style="width:24px;height:24px">+</button></div>
@@ -425,6 +436,7 @@ function parseHash(){ const h = decodeURIComponent(location.hash.replace(/^#\/?/
   if (a === "p" && b) return { v: c === "edit" ? "edit" : "page", id: b };
   if (a === "new") return { v: "new", parent: b || null };
   if (a === "recent") return { v: "recent" };
+  if (a === "members") return { v: "members" };
   if (a === "search") return { v: "search", q: b || "" };
   return { v: "home" }; }
 let lastRoute = "";
@@ -440,6 +452,7 @@ function route(force){
   if (r.v === "edit") return showEditor(r.id);
   if (r.v === "new") return newPage(r.parent);
   if (r.v === "recent") return showRecent();
+  if (r.v === "members") return showMembers();
   if (r.v === "search") return showSearch(r.q);
   return showHome();
 }
@@ -1019,18 +1032,78 @@ function setMode(){
   m.querySelector("span").textContent = mode === "cloud" ? "팀 공유 중" : "이 브라우저에만 저장 중";
   $("#meBtn").textContent = initials(me().name);
 }
-function showGate(msg){
-  $("#app").hidden = true; const g = $("#gate"); g.hidden = false;
-  g.innerHTML = `<div class="card"><div class="logo" style="padding:0"><i>W</i><span>${esc(SPACE)}</span></div>
-    <h1>로그인</h1><p>팀원만 볼 수 있는 위키예요.</p>
+const DAY_MAX = 3;   /* 하루 가입 요청(=관리자 확인 메일) 최대 개수 */
+const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+function gateCard(inner){ $("#app").hidden = true; const g = $("#gate"); g.hidden = false; g.innerHTML = `<div class="card"><div class="logo" style="padding:0"><i>W</i><span>${esc(SPACE)}</span></div>${inner}</div>`; }
+function showGate(msg, tab){
+  const su = tab === "signup";
+  gateCard(`<div class="gtabs"><button type="button" data-gt="login" class="${su ? "" : "on"}">로그인</button><button type="button" data-gt="signup" class="${su ? "on" : ""}">가입 요청</button></div>
+    ${su ? `<p>계정을 만들면 관리자에게 확인 메일이 가요. 관리자가 승인하면 들어올 수 있어요.</p>` : `<p>팀원만 볼 수 있는 위키예요.</p>`}
     ${msg ? `<div class="err" style="margin-bottom:12px">${esc(msg)}</div>` : ""}
-    <button class="btn" id="gGoogle" style="background:var(--panel);border:1px solid var(--line)">G&nbsp; 구글 계정으로 로그인</button>
+    ${su ? `<form id="sForm"><input id="sName" placeholder="이름 (팀에서 부르는 이름)" maxlength="30" required><input id="sEm" type="email" placeholder="이메일" autocomplete="username" required>
+        <input id="sPw" type="password" placeholder="비밀번호 (6자 이상)" minlength="6" autocomplete="new-password" required><button class="btn primary" type="submit" id="sBtn">가입 요청 보내기</button></form>
+        <div class="or">또는</div><button class="btn" id="gGoogle" style="background:var(--panel);border:1px solid var(--line)">G&nbsp; 구글 계정으로 요청하기</button>`
+    : `<button class="btn" id="gGoogle" style="background:var(--panel);border:1px solid var(--line)">G&nbsp; 구글 계정으로 로그인</button>
     <div class="or">또는 이메일</div>
     <form id="gForm"><input id="gEm" type="email" placeholder="이메일" autocomplete="username" required><input id="gPw" type="password" placeholder="비밀번호" autocomplete="current-password" required>
     <button class="btn primary" type="submit">로그인</button></form>
-    <p style="font-size:12px;margin:14px 0 0">회사망에서 구글 로그인이 막히면 이메일 로그인을 쓰세요. 계정은 관리자가 Firebase에서 만들어 줘요.</p></div>`;
-  $("#gGoogle").onclick = async () => { try { await auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()); } catch (ex) { showGate(/popup|blocked|network/i.test(ex.code || "") ? "구글 로그인 창이 막혔어요. 이메일로 로그인해 보세요" : "로그인하지 못했어요"); } };
-  $("#gForm").onsubmit = async e => { e.preventDefault(); try { await auth.signInWithEmailAndPassword($("#gEm").value.trim(), $("#gPw").value); } catch { showGate("이메일이나 비밀번호가 맞지 않아요"); } };
+    <p style="font-size:12px;margin:14px 0 0">처음이면 위 <b>가입 요청</b>에서 계정을 만드세요. 회사망에서 구글 로그인이 막히면 이메일을 쓰세요.</p>`}`);
+  $("#gate").querySelectorAll("[data-gt]").forEach(b => b.onclick = () => showGate("", b.dataset.gt));
+  $("#gGoogle").onclick = async () => { try { await auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()); } catch (ex) { showGate(/popup|blocked|network/i.test(ex.code || "") ? "구글 로그인 창이 막혔어요. 이메일을 써 보세요" : "로그인하지 못했어요", tab); } };
+  if (!su) $("#gForm").onsubmit = async e => { e.preventDefault(); try { await auth.signInWithEmailAndPassword($("#gEm").value.trim(), $("#gPw").value); } catch { showGate("이메일이나 비밀번호가 맞지 않아요"); } };
+  else $("#sForm").onsubmit = async e => { e.preventDefault(); const btn = $("#sBtn"); btn.disabled = true; btn.textContent = "보내는 중…";
+    const name = $("#sName").value.trim(), em = $("#sEm").value.trim(), pw = $("#sPw").value;
+    signingUp = true;
+    try {
+      const cr = await auth.createUserWithEmailAndPassword(em, pw);
+      await cr.user.updateProfile({ displayName: name });
+      const ok = await sendRequest(cr.user, name);
+      if (!ok) { gateMsg = [`오늘 가입 요청이 가득 찼어요 (하루 ${DAY_MAX}명까지). 내일 다시 시도해 주세요.`, "signup"]; signingUp = false; await cr.user.delete().catch(() => auth.signOut()); return; }
+      cr.user.sendEmailVerification().catch(() => {});
+      signingUp = false; showPending(cr.user, true);
+    } catch (ex) { signingUp = false; const c = ex.code || "";
+      showGate(c.includes("email-already-in-use") ? "이미 가입된 이메일이에요. 로그인해 보세요" : c.includes("weak-password") ? "비밀번호는 6자 이상이어야 해요" : c.includes("invalid-email") ? "이메일 주소를 확인해 주세요" : c.includes("operation-not-allowed") ? "관리자가 이메일 가입을 아직 켜지 않았어요" : "가입 요청을 보내지 못했어요", "signup"); }
+  };
+}
+let signingUp = false, gateMsg = null;
+/* 가입 요청: 하루 DAY_MAX개 넘으면 막음, 관리자 확인 메일(EmailJS 설정이 있을 때) */
+async function sendRequest(u, name){
+  const meta = fs.collection("wiki_meta").doc("signup"), d = today();
+  const ok = await fs.runTransaction(async tx => { const snap = await tx.get(meta), cur = snap.exists ? snap.data() : {};
+    const n = cur.day === d ? (cur.count || 0) : 0; if (n >= DAY_MAX) return false;
+    tx.set(meta, { day: d, count: n + 1 }); return true; });
+  if (!ok) return false;
+  await fs.collection("wiki_requests").doc(u.uid).set({ email: u.email, name: name || u.displayName || "", at: Date.now(), verified: !!u.emailVerified, provider: (u.providerData[0] || {}).providerId || "" });
+  notifyAdmin(name || u.displayName || "", u.email);
+  return true;
+}
+function notifyAdmin(name, email){
+  const ej = CFG.notify && CFG.notify.emailjs; if (!ej || !ej.serviceId || !ej.templateId || !ej.publicKey) return;
+  fetch("https://api.emailjs.com/api/v1.0/email/send", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ service_id: ej.serviceId, template_id: ej.templateId, user_id: ej.publicKey,
+      template_params: { name, email, space: SPACE, link: location.href.split("#")[0] + "#/members", time: new Date().toLocaleString("ko-KR") } }) }).catch(() => {});
+}
+async function showPending(u, fresh){
+  let req = null; try { const r = await fs.collection("wiki_requests").doc(u.uid).get(); req = r.exists ? r.data() : null; } catch {}
+  try { await u.reload(); } catch {}
+  const pw = (u.providerData[0] || {}).providerId === "password";
+  if (req && pw && u.emailVerified && !req.verified) fs.collection("wiki_requests").doc(u.uid).update({ verified: true }).catch(() => {});
+  if (!req) {
+    gateCard(`<h1>아직 팀원이 아니에요</h1><p>${esc(u.email)} 계정은 위키 권한이 없어요. 가입 요청을 보내면 관리자가 확인해요.</p>
+      <button class="btn primary" id="pReq">가입 요청 보내기</button><div style="height:8px"></div><button class="btn" id="pOut">다른 계정으로 로그인</button>`);
+    $("#pReq").onclick = async () => { $("#pReq").disabled = true; try { const ok = await sendRequest(u, u.displayName || ""); if (!ok) { gateCard(`<h1>가입이 막혔어요</h1><p>오늘 가입 요청이 가득 찼어요 (하루 ${DAY_MAX}명까지). 내일 다시 시도해 주세요.</p><button class="btn" id="pOut">로그아웃</button>`); $("#pOut").onclick = () => auth.signOut(); return; } showPending(u, true); } catch { toast("요청을 보내지 못했어요"); $("#pReq").disabled = false; } };
+    $("#pOut").onclick = () => auth.signOut(); return;
+  }
+  gateCard(`<h1>${fresh ? "가입 요청을 보냈어요" : "승인을 기다리는 중이에요"}</h1>
+    <p>관리자가 승인하면 바로 들어올 수 있어요. 승인 뒤 이 화면에서 <b>다시 확인</b>을 눌러 주세요.</p>
+    ${pw ? `<div class="gstep ${u.emailVerified ? "done" : ""}">${u.emailVerified ? "✓ 이메일 인증 완료" : `① 메일함에서 <b>이메일 인증</b> 링크를 눌러 주세요 (${esc(u.email)})`}</div>` : ""}
+    <div class="gstep">${pw ? "②" : "①"} 관리자 승인 대기 중</div>
+    <button class="btn primary" id="pChk">다시 확인</button><div style="height:8px"></div>
+    ${pw && !u.emailVerified ? `<button class="btn" id="pRe">인증 메일 다시 보내기</button><div style="height:8px"></div>` : ""}
+    <button class="btn" id="pOut">로그아웃</button>`);
+  $("#pChk").onclick = async () => { try { await u.reload(); await u.getIdToken(true); } catch {} location.reload(); };
+  if ($("#pRe")) $("#pRe").onclick = () => u.sendEmailVerification().then(() => toast("인증 메일을 다시 보냈어요"), () => toast("잠시 뒤에 다시 시도해 주세요"));
+  $("#pOut").onclick = () => auth.signOut();
 }
 function showApp(){ $("#gate").hidden = true; $("#app").hidden = false; setMode(); }
 const loadScript = src => new Promise((res, rej) => { const s = document.createElement("script"); s.src = src; s.onload = res; s.onerror = rej; document.head.appendChild(s); });
@@ -1041,12 +1114,43 @@ async function bootCloud(){
   firebase.initializeApp(CFG.firebase); fs = firebase.firestore(); auth = firebase.auth(); mode = "cloud";
   auth.onAuthStateChanged(u => {
     user = u; if (unsub) { unsub(); unsub = null; } ready = false;
-    if (!u) { showGate(); return; }
+    if (!u) { isAdmin = false; if (unsubReq) { unsubReq(); unsubReq = null; } const gm = gateMsg; gateMsg = null; showGate(gm ? gm[0] : "", gm ? gm[1] : ""); return; }
+    if (signingUp) return;
     showApp(); main().innerHTML = `<div class="content"><div class="empty">불러오는 중…</div></div>`;
     unsub = fs.collection("wiki_pages").onSnapshot(s => { pages = s.docs.map(d => ({ id: d.id, ...d.data() })); const first = !ready; ready = true; renderTree();
         if (first || !editing) route(true); else renderTree(); },
-      ex => { if (/permission/i.test(ex.code || ex.message)) { const em = u.email; auth.signOut(); showGate(`${em} 계정은 아직 위키 권한이 없어요. 관리자에게 이메일 등록을 요청하세요.`); } else toast("불러오지 못했어요. 새로고침해 보세요"); });
+      ex => { if (/permission/i.test(ex.code || ex.message)) { if (!signingUp) showPending(u, false); } else toast("불러오지 못했어요. 새로고침해 보세요"); });
+    checkAdmin();
   });
+}
+let isAdmin = false, reqs = [], members = [], unsubReq = null, unsubMem = null;
+function checkAdmin(){
+  if (unsubReq) unsubReq(); if (unsubMem) unsubMem();
+  unsubReq = fs.collection("wiki_requests").onSnapshot(s => { isAdmin = true; reqs = s.docs.map(d => ({ uid: d.id, ...d.data() })).sort((a, b) => b.at - a.at); paintAdmin(); },
+    () => { isAdmin = false; paintAdmin(); });
+  unsubMem = fs.collection("wiki_members").onSnapshot(s => { members = s.docs.map(d => ({ email: d.id, ...d.data() })).sort((a, b) => (a.name || "").localeCompare(b.name || "", "ko")); if (parseHash().v === "members") route(true); }, () => {});
+}
+function paintAdmin(){
+  const a = $("#navMembers"); a.hidden = !isAdmin; $("#nReq").textContent = reqs.length ? reqs.length : ""; if (parseHash().v === "members") route(true);
+}
+function showMembers(){
+  renderTree(); document.title = "팀원 관리 · " + SPACE;
+  if (!isAdmin) { main().innerHTML = `<div class="content"><div class="empty"><b>관리자만 볼 수 있어요</b></div></div>`; return; }
+  const ago = t => when(t);
+  main().innerHTML = `<div class="pagehd"><div class="crumbs"><a href="#/">${esc(SPACE)}</a><span class="sep">/</span><span>팀원 관리</span></div></div>
+  <div class="content"><h1 class="ptitle">팀원 관리</h1><div class="byline">가입 요청을 승인하면 바로 위키에 들어올 수 있어요. 하루 가입 요청은 ${DAY_MAX}개까지 받아요.</div>
+  <div class="sec"><h3>가입 요청 ${reqs.length}</h3>${reqs.length ? `<div class="plist">${reqs.map(r => `<div class="mrow"><span class="avatar" style="cursor:default">${esc(initials(r.name || r.email))}</span>
+      <span class="pm"><b>${esc(r.name || "(이름 없음)")}</b><small>${esc(r.email)} · ${ago(r.at)} · ${r.provider === "google.com" ? "구글 계정" : r.verified ? "이메일 인증됨" : "이메일 인증 전"}</small></span>
+      <button class="btn sm primary" data-ok="${esc(r.uid)}">승인</button><button class="btn sm" data-no="${esc(r.uid)}">거절</button></div>`).join("")}</div>` : `<p style="color:var(--muted)">새 요청이 없어요.</p>`}</div>
+  <div class="sec"><h3>팀원 ${members.length}</h3>${members.length ? `<div class="plist">${members.map(m => `<div class="mrow"><span class="avatar" style="cursor:default">${esc(initials(m.name || m.email))}</span>
+      <span class="pm"><b>${esc(m.name || m.email)}</b><small>${esc(m.email)} · ${ago(m.at)} 승인</small></span><button class="btn sm" data-rm="${esc(m.email)}">내보내기</button></div>`).join("")}</div>` : `<p style="color:var(--muted)">승인한 팀원이 아직 없어요. (규칙에 직접 적은 관리자는 여기 안 보여요)</p>`}</div></div>`;
+  main().querySelectorAll("[data-ok]").forEach(b => b.onclick = async () => { const r = reqs.find(x => x.uid === b.dataset.ok); if (!r) return;
+    if (r.provider !== "google.com" && !r.verified && !confirm(`${r.email}은(는) 아직 이메일 인증 전이에요. 승인해도 인증을 마쳐야 들어올 수 있어요. 승인할까요?`)) return;
+    try { const bt = fs.batch(); bt.set(fs.collection("wiki_members").doc(r.email.toLowerCase()), { name: r.name || "", at: Date.now(), by: me().email }); bt.delete(fs.collection("wiki_requests").doc(r.uid)); await bt.commit(); toast(`${r.name || r.email}님을 승인했어요`); } catch (ex) { toast(errMsg(ex)); } });
+  main().querySelectorAll("[data-no]").forEach(b => b.onclick = async () => { const r = reqs.find(x => x.uid === b.dataset.no); if (!r || !confirm(`${r.email}의 가입 요청을 거절할까요?`)) return;
+    try { await fs.collection("wiki_requests").doc(r.uid).delete(); toast("거절했어요"); } catch (ex) { toast(errMsg(ex)); } });
+  main().querySelectorAll("[data-rm]").forEach(b => b.onclick = async () => { if (!confirm(`${b.dataset.rm}을(를) 팀에서 내보낼까요? 다시 들어오려면 가입 요청부터 해야 해요.`)) return;
+    try { await fs.collection("wiki_members").doc(b.dataset.rm).delete(); toast("내보냈어요"); } catch (ex) { toast(errMsg(ex)); } });
 }
 function bootLocal(){ mode = "local"; showApp(); loadLocal(); }
 wireChrome();

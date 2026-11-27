@@ -18,5 +18,11 @@ window.WIKI_CONFIG = {
   // 이미지·영상 올리기 (Cloudinary). 새 파일은 목록의 마지막 계정으로 올라갑니다.
   cloudinary: [
     { cloudName: "evqhgyll", uploadPreset: "monster_ref" }
-  ]
+  ],
+
+  // 가입 요청이 오면 관리자에게 확인 메일 보내기 (EmailJS 무료, 받는 메일 주소는 EmailJS 템플릿에만 적음)
+  // 비워 두면 메일 없이 위키의 "팀원 관리"에만 요청이 쌓여요. 하루 3개까지.
+  notify: {
+    emailjs: { serviceId: "", templateId: "", publicKey: "" }
+  }
 };
