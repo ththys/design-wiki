@@ -26,7 +26,7 @@
 |---|---|
 | 로컬로 보기 | `python3 -m http.server` 후 `http://localhost:8000/index.html?local` (`?local` = 클라우드 없이 이 브라우저에만 저장) |
 | 문법 확인 | `node -e "const s=require('fs').readFileSync('index.html','utf8');[...s.matchAll(/<script>([\s\S]*?)<\/script>/g)].forEach(x=>new Function(x[1]));console.log('ok')"` |
-| 스모크 테스트 | `python3 tests/smoke_test.py` (Playwright + Chromium 필요, 47개 항목, 로컬 모드. 마지막 줄 `OK`) |
+| 스모크 테스트 | `python3 tests/smoke_test.py` (Playwright + Chromium 필요, 49개 항목, 로컬 모드. 마지막 줄 `OK`) |
 | 배포 | `git push` → GitHub Pages가 자동 배포. 확인: `gh api "repos/ththys/design-wiki/actions/runs?per_page=1" --jq '.workflow_runs[0]\|.head_sha+" "+.status+" "+(.conclusion//"")'` |
 
 - 커밋 메시지: 한국어 한 줄로 무엇이 바뀌었는지.
@@ -79,6 +79,9 @@
 ### 본문 HTML
 - 저장·보기·붙여 넣기 모두 `sanitize()`를 거침. 허용 태그: `P H1~H6 B I U S SUB SUP MARK A UL OL LI BLOCKQUOTE PRE CODE HR BR TABLE THEAD TBODY TR TH TD FIGURE FIGCAPTION IMG VIDEO DIV` + `TIME.date`, `SPAN.status`. 글 속 `\u200b`(커서 빼기용)는 저장할 때 지움.
 - 특별한 모양: 패널 `div.panel.(info|note|warn|ok|err)`, 할 일 `ul.check > li(.done)`, 페이지 링크 `a.plink[data-page=id]`, 그림 크기 `figure.w-s|w-m`. 이미지·영상 주소는 `https://` 또는 `data:image/`만.
+- **옵션 패널** `div.opts[data-opts]` = `{title, rows:[{n 이름, t text|num|check|enum|head, v 값(check는 true/false), d 설명}]}` — 설정 창 예시를 그려 주는 블록(`/options`). `mountOpts()`가 그림, 설명 있는 줄은 마우스 올리면/누르면 아래 줄로 보임. 편집 `openOptsEditor()`(표, 엑셀 붙여 넣기: 이름·값·설명, 값 모양으로 칸 종류 추측).
+- **글 사이 이미지** `span.ifig.w-s|w-m|w-l > img` — 글이 있는 줄에서 이미지를 넣으면 그 자리에 글자처럼 들어감(`inlineSpot()`), 빈 줄이면 예전처럼 `figure`. 그림 막대 ‘한 줄 차지 ↔ 글 사이로’(`toggleInline`).
+- **나란히 놓기** `div.cols.c2.fit` — 칸 넓이가 내용 크기대로(`/side`). `insertBlock()`은 이제 `blockInBox()`로 나란히 칸·접기 속·패널 안에 그대로 넣음.
 - **오른쪽 위 바로가기**: 관리자가 페이지 ⋯ 메뉴 ‘오른쪽 위 바로가기에 넣기’로 고른 페이지(최대 6개)가 🔔 왼쪽에 제목 링크로 보임. `wiki_meta/settings.quickLinks`(로컬 `wiki-qlinks`). 우클릭: 새 탭·순서·빼기. (용어 설명집 옆 패널은 사용자가 원치 않아 없앰)
 - **목록·들여쓰기 키** (`listKeys()`, 페이지·댓글 공용): Tab=목록 항목 한 칸 들여쓰기(앞 항목 아래 하위 목록) / 보통 줄 `in-1~6` / 표 다음 칸(끝이면 줄 추가), Shift+Tab=반대(맨 바깥이면 그 자리 보통 줄), 항목 맨 앞 Backspace=글머리만 없애고 그 자리에 보통 줄(`liftLi(li,true)`, `in-1`로 글자 위치 유지; 하위 항목은 한 칸 바깥으로), 빈 항목 Enter=내어쓰기·목록 끝내기.
 - **되돌리기**: 브라우저 기본 되돌리기를 안 씀. 편집기(페이지·댓글 상자)마다 `ed.__u` 기록, `snapNow()`=바꾸기 직전 상태 저장, `doUndo()`. 글자 입력은 `beforeinput`에서 0.8초 덩어리로 기록. **DOM을 직접 바꾸는 새 기능을 넣으면 그 앞에 `snapNow()`를 꼭 부를 것**(안 그러면 Ctrl+Z로 안 돌아감). 키: Ctrl+Z·Alt+Z 되돌리기, Ctrl+Y·Ctrl+Shift+Z 다시.

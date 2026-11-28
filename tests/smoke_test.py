@@ -106,7 +106,7 @@ with sync_playwright() as p:
     pg.click("#edSave"); pg.wait_for_timeout(300)
 
     # 9) 이미지 붙여 넣기(로컬: 작은 이미지)
-    pg.goto(URL + f"#/p/{cid}/edit"); pg.wait_for_timeout(200); pg.click("#ed"); pg.keyboard.press("End")
+    pg.goto(URL + f"#/p/{cid}/edit"); pg.wait_for_timeout(200); pg.locator("#ed > p").last.click(); pg.keyboard.press("End"); pg.keyboard.press("Enter")
     png = os.path.join(tempfile.mkdtemp(), "a.png")
     import base64; open(png, "wb").write(base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="))
     pg.set_input_files("#edFile", png); pg.wait_for_timeout(300)
@@ -377,6 +377,7 @@ with sync_playwright() as p:
         setup(sel_all); fn(); pg.wait_for_timeout(120)
         if pg.locator("#feCanvas").count(): pg.click('[data-fe="ok"]'); pg.wait_for_timeout(150)
         if pg.locator("#gePrev").count(): pg.click('[data-ge="ok"]'); pg.wait_for_timeout(150)
+        if pg.locator("#opPrev").count(): pg.click('[data-oe="ok"]'); pg.wait_for_timeout(150)
         if pg.locator(".chippop").count(): pg.keyboard.press("Escape"); pg.wait_for_timeout(50)
         after = edh()
         if after == base: bad.append(name + ":반응없음"); return
@@ -392,10 +393,10 @@ with sync_playwright() as p:
     for k in ["check", "quote", "pre", "hr", "table"]: try_act(k, tb(f'[data-act="{k}"]'))
     for lbl in ["정보", "메모", "성공", "주의", "오류"]:
         try_act("패널 " + lbl, lambda lbl=lbl: (pg.click('#edbar [data-act="panel"]'), pg.wait_for_timeout(80), pg.locator(".menu button", has_text=lbl).click()))
-    for lbl in ["접기", "상태", "날짜", "결정", "목차", "2단 레이아웃", "3단 레이아웃", "플로우차트", "간트 차트"]:
+    for lbl in ["접기", "상태", "날짜", "결정", "목차", "2단 레이아웃", "3단 레이아웃", "플로우차트", "간트 차트", "옵션 패널", "나란히 놓기"]:
         try_act("더 넣기 " + lbl, lambda lbl=lbl: (pg.click('#edbar [data-act="more"]'), pg.wait_for_timeout(80), pg.locator(".menu button", has_text=lbl).first.click()))
     try_act("글 모양 제목2", lambda: pg.select_option("#edbar select", "h2"))
-    for cmd in ["/code", "/divider", "/panel", "/table", "/expand", "/quote", "/action", "/decision", "/toc", "/layout", "/heading"]:
+    for cmd in ["/code", "/divider", "/panel", "/table", "/expand", "/quote", "/action", "/decision", "/toc", "/layout", "/heading", "/options", "/side"]:
         try_act("슬래시 " + cmd, lambda cmd=cmd: (pg.keyboard.type(" " + cmd), pg.wait_for_timeout(80), pg.keyboard.press("Enter")))
     for keys, sa in [("Control+Alt+1", False), ("Control+Shift+8", False), ("Control+Shift+7", False), ("Control+Shift+9", False), ("Control+Alt+e", False), ("Control+Alt+y", True), ("Control+Shift+s", True), ("Control+b", True)]:
         try_act("단축키 " + keys, lambda keys=keys: pg.keyboard.press(keys), sa)
@@ -450,6 +451,38 @@ with sync_playwright() as p:
     pg.click("#qlinks .qlink", button="right"); pg.locator(".menu button", has_text="바로가기에서 빼기").click(); pg.wait_for_timeout(200)
     gone = pg.locator("#qlinks .qlink").count() == 0
     check("오른쪽 위 바로가기: 페이지 메뉴로 넣기·눌러서 이동·새로고침해도 유지·우클릭으로 빼기", has and went and kept and gone, f"{has},{went},{kept},{gone}")
+
+    # 26) 옵션 패널·나란히 놓기·글 사이 이미지
+    import os, base64, tempfile
+    png = os.path.join(tempfile.gettempdir(), "wiki_t.png")
+    open(png, "wb").write(base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAFklEQVR4nGP8z0AaYBzVMKphVAN9NQAAjd8B/1m7l3kAAAAASUVORK5CYII="))
+    pg.goto(URL + "#/"); pg.wait_for_timeout(150); pg.click("#createBtn"); pg.wait_for_timeout(250); pg.fill("#edTitle", "옵션 시험"); pg.click("#ed")
+    pg.keyboard.type("/options"); pg.wait_for_timeout(100); pg.keyboard.press("Enter"); pg.wait_for_timeout(300)
+    dflt = pg.locator("#opRows tr").count() == 5 and pg.locator("#opPrev .opv-h", has_text="MoveClockWise").count() == 1
+    pg.click('[data-oe="add"]'); pg.wait_for_timeout(50); last = pg.locator('#opRows [data-f="n"]').last
+    last.evaluate("(el, t) => { const dt = new DataTransfer(); dt.setData('text/plain', t); el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true })); }", "DoNotLookAtTarget\tfalse\t대상을 보지 않음\nMoveSpeedRate\t1.5\nENUM_MoveSpeed\tWalk")
+    pg.wait_for_timeout(100)
+    pasted = pg.locator("#opRows tr").count() == 8 and pg.locator("#opPrev .ock").count() == 2 and pg.locator("#opPrev .oin.sel", has_text="Walk").count() == 1 and pg.locator("#opPrev .oin.num", has_text="1.5").count() == 1
+    pg.click('[data-oe="ok"]'); pg.wait_for_timeout(200); in_ed = pg.locator("#ed div.opts .opv").count() == 1
+    # 나란히: 왼쪽 이미지, 오른쪽 옵션 패널
+    pg.locator("#ed > p").last.click(); pg.keyboard.type("/side"); pg.wait_for_timeout(100); pg.keyboard.press("Enter"); pg.wait_for_timeout(100)
+    pg.set_input_files("#edFile", png); pg.wait_for_timeout(400)
+    img_in_col = pg.locator("#ed .cols.fit .col").first.locator("figure img").count() == 1
+    pg.locator("#ed .cols.fit .col").nth(1).locator("p").click(); pg.keyboard.type("/options"); pg.wait_for_timeout(100); pg.keyboard.press("Enter"); pg.wait_for_timeout(200); pg.click('[data-oe="ok"]'); pg.wait_for_timeout(200)
+    opt_in_col = pg.locator("#ed .cols.fit .col").nth(1).locator("div.opts").count() == 1
+    # 글 사이 이미지 두 장 나란히
+    pg.evaluate("(() => { const e = document.querySelector('#ed'); const p = document.createElement('p'); p.textContent = '공격 패턴 예시 '; e.appendChild(p); const r = document.createRange(); r.setStart(p.firstChild, 8); getSelection().removeAllRanges(); getSelection().addRange(r); saveSel(); })()")
+    pg.set_input_files("#edFile", png); pg.wait_for_timeout(400); pg.set_input_files("#edFile", png); pg.wait_for_timeout(400)
+    two_inline = pg.evaluate("[...document.querySelectorAll('#ed p')].some(p => p.querySelectorAll('span.ifig img').length === 2 && p.textContent.includes('공격 패턴'))")
+    pg.locator("#ed span.ifig img").first.click(); pg.wait_for_timeout(100); pg.locator(".figbar button", has_text="한 줄 차지").click(); pg.wait_for_timeout(100)
+    tog = pg.locator("#ed span.ifig").count() == 1
+    pg.keyboard.press("Control+z"); pg.wait_for_timeout(100); undo_ok = pg.locator("#ed span.ifig").count() == 2
+    pg.evaluate("document.querySelector('#ed').focus()"); pg.keyboard.press("Control+s"); pg.wait_for_timeout(400)
+    view = pg.locator("#pDoc .cols.fit figure img").count() == 1 and pg.locator("#pDoc .cols.fit .opv").count() == 1 and pg.locator("#pDoc p span.ifig img").count() == 2 and pg.locator("#pDoc .opv").count() == 2
+    pg.locator("#pDoc .opv-t tr.hasd").first.hover(); pg.wait_for_timeout(50); tip = pg.locator("#pDoc .opv-t tr.od", has_text="대상을 보지 않음").first.is_visible()
+    srch = "DoNotLookAtTarget" in pg.evaluate("(JSON.parse(localStorage.getItem('wiki-v1')).pages.find(p=>p.title==='옵션 시험')||{}).text || ''")
+    check("옵션 패널(기본·엑셀 붙여넣기·설명)·나란히(이미지|패널)·글 사이 이미지 2장·한 줄 전환·되돌리기·검색", dflt and pasted and in_ed and img_in_col and opt_in_col and two_inline and tog and undo_ok and view and tip and srch,
+          f"{dflt},{pasted},{in_ed},{img_in_col},{opt_in_col},{two_inline},{tog},{undo_ok},{view},{tip},{srch}")
     check("자바스크립트 오류 없음", not errs, "; ".join(errs[:3]))
     b.close()
 srv.shutdown()
