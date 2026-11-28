@@ -191,6 +191,8 @@ body.rzing{cursor:col-resize;user-select:none} body.rzing *{cursor:col-resize!im
 .doc h6{font-size:13px;font-weight:600;margin:14px 0 6px;color:var(--muted)}
 .doc [id^="h-"]{scroll-margin-top:72px}
 .doc .al-c{text-align:center} .doc .al-r{text-align:right}
+.doc .lh-1{line-height:1.35} .doc .lh-3{line-height:2.1} .doc .lh-4{line-height:2.6}
+#lhSel{height:30px;font-size:13px;margin-left:4px}
 .doc .in-1{margin-left:28px} .doc .in-2{margin-left:56px} .doc .in-3{margin-left:84px} .doc .in-4{margin-left:112px} .doc .in-5{margin-left:140px} .doc .in-6{margin-left:168px}
 .doc mark{background:rgba(255,214,0,.45);color:inherit;border-radius:2px;padding:0 1px}
 .status{display:inline-block;font-size:11px;font-weight:700;line-height:18px;padding:0 6px;border-radius:3px;vertical-align:1px;white-space:nowrap;background:#dfe1e6;color:#44546f}
@@ -298,7 +300,9 @@ body.rzing{cursor:col-resize;user-select:none} body.rzing *{cursor:col-resize!im
 .figrz{position:fixed;z-index:17;width:14px;height:14px;background:var(--brand);border:2px solid #fff;border-radius:3px;cursor:nwse-resize;box-shadow:0 1px 4px rgba(0,0,0,.3)}
 body.figsizing .figrz::after{content:attr(data-w);position:absolute;left:18px;top:-4px;background:var(--ink);color:var(--bg);font-size:11px;padding:1px 6px;border-radius:3px;white-space:nowrap}
 body.figsizing,body.figsizing *{cursor:nwse-resize!important;user-select:none}
+.doc img,.doc video{max-width:100%} .doc span.ifig{max-width:100%}
 .doc img[width],.doc video[width]{height:auto!important;max-width:100%}
+.doc td>img,.doc th>img{height:auto}
 .doc td span.ifig img:not([width]),.doc th span.ifig img:not([width]){max-height:160px}
 .figbar{position:absolute;z-index:16;display:flex;gap:2px;background:var(--ink);border-radius:4px;padding:3px}
 .figbar button{border:0;background:none;color:var(--bg);font-size:12px;padding:4px 8px;border-radius:3px;cursor:pointer}
@@ -781,8 +785,7 @@ function sanitize(html){
       if (t === "FIGURE") { const w = ["w-s", "w-m"].find(c => n.classList && n.classList.contains(c)); if (w) e.className = w; }
       if (t === "UL" && n.classList && n.classList.contains("check")) e.className = "check";
       if (t === "UL" && n.classList && n.classList.contains("decision")) e.className = "decision";
-      if (/^(P|H[1-6])$/.test(t) && n.classList) { const cs = [...n.classList].filter(c => /^(al-[cr]|in-[1-6])$/.test(c)); if (cs.length) e.className = cs.join(" "); }
-      if (t === "LI" && n.classList && n.classList.contains("done")) e.className = "done";
+      if (/^(P|H[1-6]|LI)$/.test(t) && n.classList) { const cs = [...n.classList].filter(c => /^(al-[cr]|in-[1-6]|lh-[134])$/.test(c) || (t === "LI" && c === "done")); if (cs.length) e.className = cs.join(" "); }
       if ((t === "TD" || t === "TH")) { ["colspan", "rowspan"].forEach(a => { const v = parseInt(n.getAttribute(a)); if (v > 1 && v < 50) e.setAttribute(a, v); }); }
       walk(n, e);
       if (t === "FIGURE" && !e.querySelector("img,video")) return;
@@ -837,6 +840,7 @@ function wireExtras(root){
 function prepEditor(root){
   root.querySelectorAll("span.status,span.mention,time.date,div.toc,div.include").forEach(x => x.contentEditable = "false"); markDue(root);
   root.querySelectorAll("div.flow").forEach(prepFlowBlock); root.querySelectorAll("div.gantt").forEach(prepGanttBlock); root.querySelectorAll("div.opts").forEach(prepOptsBlock);
+  if (root === ed || (root && root.classList && root.classList.contains("rbox"))) wrapStrayMedia(root);
   root.querySelectorAll("span.ifig").forEach(x => x.contentEditable = "false");
   root.querySelectorAll("div.toc").forEach(x => x.textContent = "목차 — 보기 화면에서 이 페이지의 제목들이 여기에 나와요");
   root.querySelectorAll("div.include").forEach(x => { const t = byId(x.dataset.page); x.textContent = "📄 페이지 불러오기: " + (t ? (t.title || "제목 없음") : "지워진 페이지") + " — 보기 화면에서 그 페이지 내용이 여기에 나와요"; });
@@ -2098,6 +2102,27 @@ function openLinkMap(id){
   draw();
 }
 
+/* 다른 탭·웹 페이지에서 끌어오면 브라우저가 맨 <img>를 넣음 → 위키 이미지 모양으로 감싸기 */
+function wrapStrayMedia(root){
+  (root || ed) && (root || ed).querySelectorAll("img,video").forEach(m => {
+    if (m.closest("figure,span.ifig,.fc,.gt,.opv,.avatar")) return;
+    const b = m.closest("p,li,td,th,h1,h2,h3,h4,h5,h6");
+    if (b && (/^T[DH]$/.test(b.tagName) || b.textContent.replace(/[\s ​]/g, ""))) { const sp = document.createElement("span"); sp.className = "ifig"; sp.contentEditable = "false"; m.replaceWith(sp); sp.appendChild(m); }
+    else { const f = document.createElement("figure"); const host = b && b.tagName === "P" && !b.textContent.replace(/[\s ​]/g, "") && b.querySelectorAll("img,video").length === 1 ? b : null;
+      if (host) { host.replaceWith(f); f.appendChild(m); } else { m.replaceWith(f); f.appendChild(m); } }
+  });
+}
+/* 행간 (줄 사이 간격): 고른 줄들에 lh-1 좁게 / (기본) / lh-3 넓게 / lh-4 아주 넓게 */
+const LH = [["", "행간 보통"], ["lh-1", "행간 좁게"], ["lh-3", "행간 넓게"], ["lh-4", "행간 아주 넓게"]];
+function blocksInSel(){
+  const s = getSelection(); if (!s.rangeCount || !ed) return []; const r = s.getRangeAt(0), out = [];
+  const one = (r.startContainer.nodeType === 1 ? r.startContainer : r.startContainer.parentElement).closest("p,h1,h2,h3,h4,h5,h6,li");
+  ed.querySelectorAll("p,h1,h2,h3,h4,h5,h6,li").forEach(b => { if (r.intersectsNode(b) && !b.querySelector("p,li")) out.push(b); });
+  if (!out.length && one && ed.contains(one)) out.push(one); return out;
+}
+function setLineHeight(cls){ const bs = blocksInSel(); if (!bs.length) return; snapNow();
+  bs.forEach(b => { b.classList.remove("lh-1", "lh-3", "lh-4"); if (cls) b.classList.add(cls); if (!b.className) b.removeAttribute("class"); }); }
+
 /* ───────── 라우팅 ───────── */
 function parseHash(){ const h = decodeURIComponent(location.hash.replace(/^#\/?/, "")); const [a, b, c] = h.split("/");
   if (a === "p" && b) return c === "edit" ? { v: "edit", id: b } : { v: "page", id: b, c: c === "c" ? h.split("/")[3] : null };
@@ -2450,7 +2475,7 @@ function openEditor(p, isNew){
   document.title = (isNew ? "새 페이지" : "편집: " + (p.title || "")) + " · " + SPACE;
   main().innerHTML = `
     <div class="edbar" id="edbar">
-      <select id="blk" title="글 모양"><option value="p">본문</option><option value="h1">제목 1</option><option value="h2">제목 2</option><option value="h3">제목 3</option><option value="h4">제목 4</option><option value="h5">제목 5</option><option value="h6">제목 6</option></select>
+      <select id="blk" title="글 모양"><option value="p">본문</option><option value="h1">제목 1</option><option value="h2">제목 2</option><option value="h3">제목 3</option><option value="h4">제목 4</option><option value="h5">제목 5</option><option value="h6">제목 6</option></select><select id="lhSel" title="행간 (줄 사이 간격)"><option value="">행간 보통</option><option value="lh-1">행간 좁게</option><option value="lh-3">행간 넓게</option><option value="lh-4">행간 아주 넓게</option></select>
       <span class="sep"></span>
       <button class="t" data-cmd="bold" title="굵게 (Ctrl+B)"><b>B</b></button><button class="t" data-cmd="italic" title="기울임 (Ctrl+I)"><i>I</i></button><button class="t" data-cmd="underline" title="밑줄 (Ctrl+U)"><u>U</u></button><button class="t" data-cmd="strikeThrough" title="취소선 (Ctrl+Shift+S)"><s>S</s></button><button class="t" data-act="code" title="코드 (Ctrl+Shift+M)">&lt;/&gt;</button>
       <span class="sep"></span>
@@ -2503,7 +2528,10 @@ function wireEditor(id, isNew){
   const bar = $("#edbar"), blk = $("#blk");
   document.addEventListener("selectionchange", onSel);
   function onSel(){ if (!ed || !document.body.contains(ed)) { document.removeEventListener("selectionchange", onSel); return; } saveSel(); syncBar(); placeTblBar(); }
+  const lhSel = $("#lhSel");
+  lhSel.onchange = () => { restoreSel(); setLineHeight(lhSel.value); ed.focus(); };
   const syncBar = () => { const b = curBlock(); const tag = b && b.nodeType === 1 ? b.tagName.toLowerCase() : "p"; blk.value = /^h[1-6]$/.test(tag) ? tag : "p";
+    { const bb = blocksInSel()[0]; lhSel.value = bb ? (["lh-1", "lh-3", "lh-4"].find(c => bb.classList.contains(c)) || "") : ""; }
     ["bold", "italic", "underline", "strikeThrough", "insertUnorderedList", "insertOrderedList"].forEach(c => { const x = bar.querySelector(`[data-cmd="${c}"]`); try { x.classList.toggle("on", document.queryCommandState(c)); } catch {} }); };
   bar.addEventListener("mousedown", e => { if (e.target.closest("button.t")) e.preventDefault(); });
   blk.onchange = () => { restoreSel(); snapNow(); document.execCommand("formatBlock", false, "<" + blk.value + ">"); ed.focus(); };
@@ -2594,7 +2622,9 @@ function wireEditor(id, isNew){
     const fb = e.target.closest("div.flow,div.gantt"); if (fb && ed.contains(fb)) { if (e.target.closest("[data-fopen],[data-gopen]") || !e.target.closest(".fc-bar,.gt-bar-top,[data-gi],.fc-tip")) { fb.classList.contains("flow") ? openFlowEditor(fb) : openGanttEditor(fb); } return; }
     const chip = e.target.closest("time.date,span.status"); if (chip && ed.contains(chip)) { chip.tagName === "TIME" ? openDatePop(chip, true) : openStatusPop(chip); return; }
     const li = e.target.closest("ul.check>li"); if (li) { const r = li.getBoundingClientRect(); if (e.clientX - r.left < 26) { snapNow(); li.classList.toggle("done"); markDue(li); e.preventDefault(); } }
-    const f = e.target.closest("figure,span.ifig"); selectFig(f && e.target.closest("img,video") ? f : null);
+    let f = e.target.closest("figure,span.ifig"); const mm = e.target.closest("img,video");
+    if (mm && !f && !mm.closest(".fc,.gt,.opv")) { wrapStrayMedia(ed); f = mm.closest("figure,span.ifig"); }
+    selectFig(f && mm ? f : null);
     const a = e.target.closest("a"); if (a && (e.ctrlKey || e.metaKey)) { a.dataset.page ? (location.hash = "#/p/" + a.dataset.page) : window.open(a.href, "_blank"); }
   });
   /* 붙여 넣기·끌어 놓기 */
@@ -2602,12 +2632,24 @@ function wireEditor(id, isNew){
     const files = [...(e.clipboardData.files || [])].filter(f => /^(image|video)\//.test(f.type));
     if (files.length) { e.preventDefault(); saveSel(); uploadFiles(files); return; }
     const h = e.clipboardData.getData("text/html");
-    if (h) { e.preventDefault(); snapNow(); document.execCommand("insertHTML", false, sanitize(h)); fixLinks(ed); return; }
+    if (h) { e.preventDefault(); snapNow(); document.execCommand("insertHTML", false, sanitize(h)); fixLinks(ed); wrapStrayMedia(ed); prepEditor(ed); return; }
     const t = e.clipboardData.getData("text/plain");
     if (/^https?:\/\/\S+$/.test(t.trim())) { e.preventDefault(); const s = getSelection(); if (!s.isCollapsed) document.execCommand("createLink", false, t.trim()); else document.execCommand("insertHTML", false, `<a href="${esc(t.trim())}">${esc(t.trim())}</a>&nbsp;`); }
   });
   ed.addEventListener("dragover", e => { if ([...e.dataTransfer.types].includes("Files")) e.preventDefault(); });
-  ed.addEventListener("drop", e => { const files = [...e.dataTransfer.files].filter(f => /^(image|video)\//.test(f.type)); if (!files.length) return; e.preventDefault();
+  let dragInside = false; ed.addEventListener("dragstart", () => { dragInside = true; }); ed.addEventListener("dragend", () => { dragInside = false; });
+  ed.addEventListener("drop", e => { const files = [...e.dataTransfer.files].filter(f => /^(image|video)\//.test(f.type));
+    if (!files.length) { /* 다른 탭·사이트에서 끌어온 이미지 */
+      if (dragInside) { setTimeout(() => { wrapStrayMedia(ed); }, 0); return; }
+      const h = e.dataTransfer.getData("text/html"), u = (e.dataTransfer.getData("text/uri-list") || "").split("\n")[0].trim();
+      const src = (h && (h.match(/<img[^>]+src="(https:[^"]+)"/i) || [])[1]) || (/^https:\/\/\S+\.(png|jpe?g|gif|webp)(\?\S*)?$/i.test(u) ? u : "");
+      if (!src) { setTimeout(() => { wrapStrayMedia(ed); }, 0); return; }
+      e.preventDefault(); const pos = document.caretRangeFromPoint ? document.caretRangeFromPoint(e.clientX, e.clientY) : null; if (pos) { getSelection().removeAllRanges(); getSelection().addRange(pos); }
+      snapNow(); const img = document.createElement("img"); img.src = src.replace(/&amp;/g, "&"); img.alt = ""; const spot = inlineSpot();
+      if (spot) { const sp = document.createElement("span"); sp.className = "ifig w-m"; sp.contentEditable = "false"; sp.appendChild(img); const r = getSelection().getRangeAt(0); r.collapse(true); r.insertNode(sp); caretAfter(sp); }
+      else { const f = document.createElement("figure"); f.appendChild(img); saveSel(); insertBlock(f); }
+      return; }
+    e.preventDefault();
     const pos = document.caretRangeFromPoint ? document.caretRangeFromPoint(e.clientX, e.clientY) : null; if (pos) { getSelection().removeAllRanges(); getSelection().addRange(pos); } saveSel(); uploadFiles(files); });
   edTitle.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); ed.focus(); const r = document.createRange(); r.setStart(ed.firstChild || ed, 0); getSelection().removeAllRanges(); getSelection().addRange(r); } });
   /* 저장 */

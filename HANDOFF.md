@@ -198,3 +198,7 @@
 ---
 
 항목을 끝내면 체크하고, 다 끝나면 이 파일을 지운다. 계속 지킬 내용(1~8절)은 `CLAUDE.md`(또는 그 도구의 규칙 파일)로 옮긴다.
+
+### 행간 · 웹에서 끌어온 이미지 (최근)
+- 툴바 `#lhSel`: 고른 줄(P/H/LI)에 `lh-1`(좁게 1.35) / 기본 1.75 / `lh-3`(넓게 2.1) / `lh-4`(아주 넓게 2.6). `setLineHeight`, `blocksInSel`. sanitize가 P/H/LI의 `lh-[134]` 유지. snapNow로 되돌리기 가능.
+- 다른 탭·사이트에서 끌어온 맨 `<img>`: `wrapStrayMedia`가 `span.ifig`(줄·표 칸 안) 또는 `figure`로 감쌈 → 크기 제한·편집 막대·드래그 크기 조절. drop(파일 아님)·붙여넣기·클릭·prepEditor에서 호출. CSS `.doc img,.doc video{max-width:100%}`.

@@ -511,6 +511,22 @@ with sync_playwright() as p:
     pg.evaluate("document.querySelector('#ed').focus()"); pg.keyboard.press("Control+s"); pg.wait_for_timeout(400)
     wv = pg.evaluate("document.querySelector('#pDoc td img').getBoundingClientRect().width")
     check("표 칸에 이미지·그림 막대·모서리 끌어 크기·되돌리기·저장 후 유지", in_td and bars and w1 > w0 + 40 and abs(wu - w0) < 2 and abs(wv - w1) < 2, f"{in_td},{bars},{w0},{w1},{wu},{wv}")
+
+    # 29) 웹에서 끌어온 이미지(맨 img)·행간
+    pg.goto(URL + "#/"); pg.wait_for_timeout(150); pg.click("#createBtn"); pg.wait_for_timeout(250); pg.fill("#edTitle", "행간 시험"); pg.click("#ed")
+    big = "data:image/png;base64," + base64.b64encode(open(png, "rb").read()).decode()
+    pg.evaluate("src => { const e = document.querySelector('#ed'); e.innerHTML = '<table><tbody><tr><th>a</th><th>b</th></tr><tr><td></td><td>x</td></tr></tbody></table><p>끝</p>'; const img = document.createElement('img'); img.src = src; img.width = 3000; e.querySelector('td').appendChild(img); }", big)
+    pg.locator("#ed td img").click(); pg.wait_for_timeout(150)
+    stray = pg.locator("#ed td span.ifig img").count() == 1 and pg.locator(".figbar").count() == 1
+    fits = pg.evaluate("(() => { const i = document.querySelector('#ed td img').getBoundingClientRect(), c = document.querySelector('#ed td').getBoundingClientRect(); return i.right <= c.right + 1; })()")
+    pg.evaluate("(() => { const e = document.querySelector('#ed'); e.innerHTML = '<p>첫 줄</p><p>둘째 줄</p><ul><li>목록</li></ul>'; const r = document.createRange(); r.setStart(e.querySelector('p').firstChild, 0); r.setEnd(e.querySelector('li').firstChild, 1); getSelection().removeAllRanges(); getSelection().addRange(r); saveSel(); })()")
+    pg.select_option("#lhSel", "lh-3"); pg.wait_for_timeout(80)
+    lh = pg.evaluate("sanitize(document.querySelector('#ed').innerHTML)")
+    pg.keyboard.press("Control+z"); pg.wait_for_timeout(80); lhu = pg.evaluate("sanitize(document.querySelector('#ed').innerHTML)")
+    check("웹에서 끌어온 맨 이미지도 칸 안에·편집 막대 / 행간 넓게(여러 줄·목록)·되돌리기",
+          stray and fits and lh == '<p class="lh-3">첫 줄</p><p class="lh-3">둘째 줄</p><ul><li class="lh-3">목록</li></ul>' and "lh-" not in lhu, f"{stray},{fits},{lh},{lhu}")
+    pg.click("#edCancel"); pg.wait_for_timeout(100)
+    if pg.locator("#askOk").count(): pg.click("#askOk"); pg.wait_for_timeout(200)
     check("자바스크립트 오류 없음", not errs, "; ".join(errs[:3]))
     b.close()
 srv.shutdown()
