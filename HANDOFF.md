@@ -26,7 +26,7 @@
 |---|---|
 | 로컬로 보기 | `python3 -m http.server` 후 `http://localhost:8000/index.html?local` (`?local` = 클라우드 없이 이 브라우저에만 저장) |
 | 문법 확인 | `node -e "const s=require('fs').readFileSync('index.html','utf8');[...s.matchAll(/<script>([\s\S]*?)<\/script>/g)].forEach(x=>new Function(x[1]));console.log('ok')"` |
-| 스모크 테스트 | `python3 tests/smoke_test.py` (Playwright + Chromium 필요, 32개 항목, 로컬 모드. 마지막 줄 `OK`) |
+| 스모크 테스트 | `python3 tests/smoke_test.py` (Playwright + Chromium 필요, 45개 항목, 로컬 모드. 마지막 줄 `OK`) |
 | 배포 | `git push` → GitHub Pages가 자동 배포. 확인: `gh api "repos/ththys/design-wiki/actions/runs?per_page=1" --jq '.workflow_runs[0]\|.head_sha+" "+.status+" "+(.conclusion//"")'` |
 
 - 커밋 메시지: 한국어 한 줄로 무엇이 바뀌었는지.
@@ -79,6 +79,8 @@
 ### 본문 HTML
 - 저장·보기·붙여 넣기 모두 `sanitize()`를 거침. 허용 태그: `P H1~H6 B I U S SUB SUP MARK A UL OL LI BLOCKQUOTE PRE CODE HR BR TABLE THEAD TBODY TR TH TD FIGURE FIGCAPTION IMG VIDEO DIV` + `TIME.date`, `SPAN.status`. 글 속 `\u200b`(커서 빼기용)는 저장할 때 지움.
 - 특별한 모양: 패널 `div.panel.(info|note|warn|ok|err)`, 할 일 `ul.check > li(.done)`, 페이지 링크 `a.plink[data-page=id]`, 그림 크기 `figure.w-s|w-m`. 이미지·영상 주소는 `https://` 또는 `data:image/`만.
+- **되돌리기**: 브라우저 기본 되돌리기를 안 씀. 편집기(페이지·댓글 상자)마다 `ed.__u` 기록, `snapNow()`=바꾸기 직전 상태 저장, `doUndo()`. 글자 입력은 `beforeinput`에서 0.8초 덩어리로 기록. **DOM을 직접 바꾸는 새 기능을 넣으면 그 앞에 `snapNow()`를 꼭 부를 것**(안 그러면 Ctrl+Z로 안 돌아감). 키: Ctrl+Z·Alt+Z 되돌리기, Ctrl+Y·Ctrl+Shift+Z 다시.
+- 도구 막대 메뉴(패널·더 넣기)는 `showMenu`로 여는데, 문서 클릭이 메뉴를 닫으므로 여는 단추는 닫기 예외 목록(`[data-act]`, `[data-r]` 등)에 있어야 함.
 - **할 일 기한**: `ul.check>li` 안의 `time.date`는 `markDue()`가 지난 날짜=`.late`(빨강), 오늘=`.today`(노랑), 끝낸 일=`.doneD`(회색 줄)로 칠함(저장 안 되는 보기용 클래스). 줄 **중간**에서 `[] ` 쳐도 그 줄 전체가 할 일이 됨(`blockAuto`).
 - **댓글**: `richBox()` = 서식 댓글 상자(페이지 편집기와 같은 빠른 입력 `richInput()`, 위쪽 작은 도구 막대). 포커스하면 전역 `ed`를 그 상자로 바꿔서 공용 함수(날짜·멘션·선택기)를 그대로 씀(페이지 편집 중이 아닐 때만). 답글 한 단계, 편집(본인), 반응 6개, 할 일 체크는 보기에서 바로 저장, 댓글 링크. @멘션 = `span.mention[data-email]`, 사람 목록은 `people()`. 상단 🔔 = `wiki_notes` 실시간 구독.
 - **차트 블록** (본문에 JSON을 속성으로 저장, 보기 때 그림):

@@ -364,6 +364,51 @@ with sync_playwright() as p:
     check("'+ 더 넣기' 메뉴가 열리고 플로우차트 넣기", menu_ok and fe and pg.locator("#ed div.flow").count() == 1, f"{menu_ok},{fe}")
     pg.click("#edCancel"); pg.wait_for_timeout(100)
     if pg.locator("#askOk").count(): pg.click("#askOk"); pg.wait_for_timeout(200)
+
+    # 23) 모든 넣기·서식 동작: 눌러서 반응하는지 + Ctrl+Z(또는 Alt+Z)로 되돌리고 Ctrl+Y로 다시
+    pg.goto(URL + "#/"); pg.wait_for_timeout(150); pg.click("#createBtn"); pg.wait_for_timeout(250); pg.fill("#edTitle", "되돌리기 확인")
+    def setup(sel_all=False):
+        pg.evaluate("""s => { const e = document.querySelector('#ed'); e.__u = null; e.innerHTML = '<p>가나다</p>'; e.focus(); const r = document.createRange();
+          if (s) r.selectNodeContents(e.querySelector('p')); else { r.selectNodeContents(e.querySelector('p')); r.collapse(false); } getSelection().removeAllRanges(); getSelection().addRange(r); }""", sel_all)
+        pg.wait_for_timeout(30)
+    edh = lambda: pg.evaluate("sanitize(document.querySelector('#ed').innerHTML)")
+    base = "<p>가나다</p>"; bad = []
+    def try_act(name, fn, sel_all=False, undo="Control+z"):
+        setup(sel_all); fn(); pg.wait_for_timeout(120)
+        if pg.locator("#feCanvas").count(): pg.click('[data-fe="ok"]'); pg.wait_for_timeout(150)
+        if pg.locator("#gePrev").count(): pg.click('[data-ge="ok"]'); pg.wait_for_timeout(150)
+        if pg.locator(".chippop").count(): pg.keyboard.press("Escape"); pg.wait_for_timeout(50)
+        after = edh()
+        if after == base: bad.append(name + ":반응없음"); return
+        pg.click("#ed", position={"x": 5, "y": 5}) if False else None
+        pg.evaluate("document.querySelector('#ed').focus()"); pg.keyboard.press(undo); pg.wait_for_timeout(80)
+        if edh() != base and not (name.startswith("슬래시") and edh().replace("&nbsp;", " ") == "<p>가나다 </p>"): bad.append(name + ":되돌리기안됨 " + edh()[:80]); return
+        pg.keyboard.press("Control+y"); pg.wait_for_timeout(80)
+        if edh() != after: bad.append(name + ":다시하기안됨")
+    tb = lambda sel: (lambda: pg.click(f'#edbar {sel}'))
+    for k in ["bold", "italic", "underline", "strikeThrough"]: try_act(k, tb(f'[data-cmd="{k}"]'), True)
+    try_act("code(인라인)", tb('[data-act="code"]'), True)
+    for k in ["insertUnorderedList", "insertOrderedList"]: try_act(k, tb(f'[data-cmd="{k}"]'))
+    for k in ["check", "quote", "pre", "hr", "table"]: try_act(k, tb(f'[data-act="{k}"]'))
+    for lbl in ["정보", "메모", "성공", "주의", "오류"]:
+        try_act("패널 " + lbl, lambda lbl=lbl: (pg.click('#edbar [data-act="panel"]'), pg.wait_for_timeout(80), pg.locator(".menu button", has_text=lbl).click()))
+    for lbl in ["접기", "상태", "날짜", "결정", "목차", "2단 레이아웃", "3단 레이아웃", "플로우차트", "간트 차트"]:
+        try_act("더 넣기 " + lbl, lambda lbl=lbl: (pg.click('#edbar [data-act="more"]'), pg.wait_for_timeout(80), pg.locator(".menu button", has_text=lbl).first.click()))
+    try_act("글 모양 제목2", lambda: pg.select_option("#edbar select", "h2"))
+    for cmd in ["/code", "/divider", "/panel", "/table", "/expand", "/quote", "/action", "/decision", "/toc", "/layout", "/heading"]:
+        try_act("슬래시 " + cmd, lambda cmd=cmd: (pg.keyboard.type(" " + cmd), pg.wait_for_timeout(80), pg.keyboard.press("Enter")))
+    for keys, sa in [("Control+Alt+1", False), ("Control+Shift+8", False), ("Control+Shift+7", False), ("Control+Shift+9", False), ("Control+Alt+e", False), ("Control+Alt+y", True), ("Control+Shift+s", True), ("Control+b", True)]:
+        try_act("단축키 " + keys, lambda keys=keys: pg.keyboard.press(keys), sa)
+    for typed in ["--- ", "``` ", "## ", "> ", "[] "]:
+        def f(typed=typed): pg.evaluate("(() => { const e = document.querySelector('#ed'); const p = document.createElement('p'); p.innerHTML = '<br>'; e.appendChild(p); const r = document.createRange(); r.setStart(p, 0); getSelection().removeAllRanges(); getSelection().addRange(r); })()"); pg.keyboard.type(typed)
+        setup(); f(); after = edh(); pg.keyboard.press("Alt+z"); pg.wait_for_timeout(60); txt = pg.inner_text("#ed")
+        if typed.strip() not in txt: bad.append("빠른서식 " + typed + ":Alt+Z 안됨")
+    setup(); pg.keyboard.type(" 새로 친 글"); pg.wait_for_timeout(900); pg.keyboard.type(" 두번째"); pg.keyboard.press("Control+z"); pg.wait_for_timeout(60)
+    t1 = pg.inner_text("#ed"); pg.keyboard.press("Control+z"); t2 = pg.inner_text("#ed")
+    if not ("새로 친 글" in t1 and "두번째" not in t1 and t2.strip() == "가나다"): bad.append(f"글자 되돌리기: {t1!r} {t2!r}")
+    check("모든 넣기·서식 동작 반응 + Ctrl+Z/Alt+Z 되돌리기 + Ctrl+Y 다시 하기", not bad, " / ".join(bad))
+    pg.click("#edCancel"); pg.wait_for_timeout(100)
+    if pg.locator("#askOk").count(): pg.click("#askOk"); pg.wait_for_timeout(200)
     check("자바스크립트 오류 없음", not errs, "; ".join(errs[:3]))
     b.close()
 srv.shutdown()
