@@ -500,9 +500,18 @@ body.figsizing,body.figsizing *{cursor:nwse-resize!important;user-select:none}
 .opv-t .ock{display:inline-grid;place-items:center;width:20px;height:20px;background:var(--code);border:1px solid var(--line);border-radius:4px;font-size:13px;color:var(--brand);font-weight:700}
 .doc .opv-t tr.oh td{background:var(--hover);font-weight:700;color:var(--ink);font-size:12px}
 .opv-t tr.hasd{cursor:help} .opv-t .oq{font-style:normal;color:var(--muted);font-size:11px}
+#optTip{position:absolute;z-index:9990;display:none;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:12.5px;line-height:1.55;white-space:pre-wrap;box-shadow:0 6px 20px rgba(0,0,0,.28);pointer-events:none}
+#optTip.pin{pointer-events:auto;border-color:var(--brand)} .opv-t tr.hasd.pin .oq{color:var(--brand)}
 .opv-t tr.od{display:none} .doc .opv-t tr.od td{color:var(--sub);font-size:12px;white-space:pre-wrap;background:var(--panel);max-width:420px}
-.opv-t tr.hasd:hover+tr.od,.opv-t tr.hasd.pin+tr.od{display:table-row}
+
 .editor .opts{position:relative;cursor:pointer}
+.editor .bdrag{position:absolute;top:-12px;left:8px;box-shadow:var(--shadow);z-index:3;display:none;border:1px solid var(--line);background:var(--bg);color:var(--sub);border-radius:6px;font-size:12px;padding:3px 8px;cursor:grab;touch-action:none}
+.editor .opts:hover>.bdrag,.editor .flow:hover>.bdrag,.editor .gantt:hover>.bdrag,.editor .bd-src>.bdrag{display:block}
+.editor .flow,.editor .gantt{position:relative}
+.bd-ghost{position:fixed;z-index:9999;pointer-events:none;background:var(--brand);color:#fff;border-radius:6px;padding:4px 10px;font-size:13px;box-shadow:0 4px 14px rgba(0,0,0,.25)}
+.bd-line{position:absolute;z-index:9998;height:3px;background:var(--brand);border-radius:2px;pointer-events:none;display:none}
+.editor .bd-src{opacity:.4} .editor td.bd-cell,.editor th.bd-cell{outline:2px dashed var(--brand);outline-offset:-3px;background:var(--hover)}
+.doc td .opts,.doc th .opts{margin:2px 0} .doc td .opv,.doc th .opv{min-width:0}
 .op-body{flex:1;display:grid;grid-template-rows:auto 1fr;gap:12px;padding:12px 18px 18px;min-height:0;overflow:auto}
 /* ── 글 사이 이미지 ── */
 .doc span.ifig{display:inline-block;vertical-align:middle;margin:2px 4px 2px 0;line-height:0}
@@ -1519,7 +1528,7 @@ function showKeysFlow(){
 function prepFlowBlock(x){ /* 편집기 안: 미리보기 + 편집 단추 */
   x.contentEditable = "false"; x.innerHTML = "";
   const v = document.createElement("div"); x.appendChild(v); mountFlow(v, parseFlowAttr(x.getAttribute("data-flow")), { mini: true });
-  x.insertAdjacentHTML("afterbegin", `<button type="button" class="btn sm primary fe-open" data-fopen>✎ 플로우차트 편집</button>`);
+  x.insertAdjacentHTML("afterbegin", `<button type="button" class="btn sm primary fe-open" data-fopen>✎ 플로우차트 편집</button><button type="button" class="bdrag" data-bdrag title="끌어서 옮기기 (표 칸 안에도 넣을 수 있어요)">⠿ 옮기기</button>`);
 }
 
 /* ───────── 간트 차트 (div.gantt[data-gantt]) ───────── */
@@ -1648,7 +1657,7 @@ function openGanttEditor(block, isNew){
 function prepGanttBlock(x){
   x.contentEditable = "false"; x.innerHTML = "";
   const v = document.createElement("div"); x.appendChild(v); mountGantt(v, parseGanttAttr(x.getAttribute("data-gantt")));
-  x.insertAdjacentHTML("afterbegin", `<button type="button" class="btn sm primary fe-open" data-gopen>✎ 간트 차트 편집</button>`);
+  x.insertAdjacentHTML("afterbegin", `<button type="button" class="btn sm primary fe-open" data-gopen>✎ 간트 차트 편집</button><button type="button" class="bdrag" data-bdrag title="끌어서 옮기기 (표 칸 안에도 넣을 수 있어요)">⠿ 옮기기</button>`);
 }
 
 /* ───────── 표 정렬 (컨플루언스처럼 머리 행 눌러서) ───────── */
@@ -1995,10 +2004,28 @@ function optsHTML(d){
   return `<div class="opv">${d.title ? `<div class="opv-h">${esc(d.title)}</div>` : ""}<table class="opv-t"><tbody>${d.rows.map(row).join("") || `<tr><td class="k" style="color:var(--muted)">줄이 없어요</td><td></td></tr>`}</tbody></table></div>`;
 }
 function mountOpts(el, d){ el.innerHTML = optsHTML(d);
-  el.onclick = e => { const tr = e.target.closest("tr.hasd"); if (tr) tr.classList.toggle("pin"); }; }
+  el.onmouseover = e => { const tr = e.target.closest("tr.hasd"); if (tr && !optTipPin) showOptTip(tr); };
+  el.onmouseout = e => { const tr = e.target.closest("tr.hasd"); if (tr && !tr.contains(e.relatedTarget) && !optTipPin) hideOptTip(); };
+  el.onclick = e => { const tr = e.target.closest("tr.hasd"); if (!tr) return; e.stopPropagation();
+    if (optTipPin === tr) { optTipPin = null; tr.classList.remove("pin"); hideOptTip(); return; }
+    if (optTipPin) optTipPin.classList.remove("pin"); optTipPin = tr; tr.classList.add("pin"); showOptTip(tr); }; }
+/* 옵션 설명: 줄 아래로 펼치지 않고, 그 자리에 떠 있는 메모 상자로 보여 주기 (누르면 고정) */
+let optTipPin = null;
+function showOptTip(tr){
+  const od = tr.nextElementSibling; if (!od || !od.classList.contains("od")) return;
+  let t = document.getElementById("optTip"); if (!t) { t = document.createElement("div"); t.id = "optTip"; document.body.appendChild(t); }
+  t.textContent = od.textContent; t.classList.toggle("pin", optTipPin === tr); t.style.display = "block";
+  const k = tr.querySelector("td.k") || tr, r = k.getBoundingClientRect(), w = Math.min(320, innerWidth - 16);
+  t.style.maxWidth = w + "px"; let left = r.left + 8, top = r.bottom + 4;
+  const tb = t.getBoundingClientRect(); if (left + tb.width > innerWidth - 8) left = innerWidth - 8 - tb.width; if (top + tb.height > innerHeight - 8) top = r.top - tb.height - 4;
+  t.style.left = left + scrollX + "px"; t.style.top = top + scrollY + "px";
+}
+function hideOptTip(){ const t = document.getElementById("optTip"); if (t) t.style.display = "none"; }
+document.addEventListener("click", e => { if (optTipPin && !e.target.closest("tr.hasd,#optTip")) { optTipPin.classList.remove("pin"); optTipPin = null; hideOptTip(); } });
+addEventListener("hashchange", () => { optTipPin = null; hideOptTip(); });
 function prepOptsBlock(x){
   x.contentEditable = "false"; mountOpts(x, parseOptsAttr(x.getAttribute("data-opts")));
-  x.insertAdjacentHTML("afterbegin", `<button type="button" class="btn sm primary fe-open" data-oopen>✎ 옵션 패널 편집</button>`);
+  x.insertAdjacentHTML("afterbegin", `<button type="button" class="btn sm primary fe-open" data-oopen>✎ 옵션 패널 편집</button><button type="button" class="bdrag" data-bdrag title="끌어서 옮기기 (표 칸 안에도 넣을 수 있어요)">⠿ 옮기기</button>`);
 }
 function openOptsEditor(block, isNew){
   let d = parseOptsAttr(block.getAttribute("data-opts")); let dirty = false;
@@ -2122,6 +2149,47 @@ function blocksInSel(){
 }
 function setLineHeight(cls){ const bs = blocksInSel(); if (!bs.length) return; snapNow();
   bs.forEach(b => { b.classList.remove("lh-1", "lh-3", "lh-4"); if (cls) b.classList.add(cls); if (!b.className) b.removeAttribute("class"); }); }
+
+/* 옵션 패널·차트 블록을 끌어서 옮기기 — 표 칸에 놓으면 칸 안으로, 아니면 줄 사이로 */
+function startBlockDrag(e, block){
+  e.preventDefault(); e.stopPropagation();
+  const ghost = document.createElement("div"); ghost.className = "bd-ghost"; ghost.textContent = "⠿ " + (block.classList.contains("opts") ? "옵션 패널" : block.classList.contains("flow") ? "플로우차트" : "간트 차트");
+  const line = document.createElement("div"); line.className = "bd-line"; document.body.append(ghost, line);
+  block.classList.add("bd-src"); let tgt = null;
+  const clear = () => { ed.querySelectorAll(".bd-cell").forEach(c => c.classList.remove("bd-cell")); line.style.display = "none"; };
+  const move = ev => {
+    ghost.style.left = ev.clientX + 12 + "px"; ghost.style.top = ev.clientY + 12 + "px"; clear(); tgt = null;
+    const el = document.elementFromPoint(ev.clientX, ev.clientY); if (!el || !ed.contains(el) || block.contains(el)) return;
+    const cell = el.closest("td,th");
+    if (cell && ed.contains(cell) && !cell.closest(".opts,.flow,.gantt")) { cell.classList.add("bd-cell"); tgt = { cell }; return; }
+    let b = el; while (b && b.parentNode && b.parentNode !== ed && !(b.parentNode.nodeType === 1 && b.parentNode.matches("div.col,div.xbody,div.panel"))) b = b.parentNode;
+    if (!b || b.nodeType !== 1 || b === ed || b === block) return; const r = b.getBoundingClientRect(), after = ev.clientY > r.top + r.height / 2;
+    tgt = { b, after }; Object.assign(line.style, { display: "block", left: r.left + "px", width: r.width + "px", top: (after ? r.bottom : r.top) - 1 + scrollY + "px" });
+  };
+  const up = () => { removeEventListener("pointermove", move); removeEventListener("pointerup", up); clear(); ghost.remove(); line.remove(); block.classList.remove("bd-src");
+    if (!tgt) return; snapNow(); const from = block.parentNode;
+    if (tgt.cell) { const c = tgt.cell; if (!c.textContent.replace(/[\s ​]/g, "") && !c.querySelector("img,video,div,table,ul,ol")) c.innerHTML = ""; c.appendChild(block); }
+    else tgt.after ? tgt.b.after(block) : tgt.b.before(block);
+    if (from && from !== ed && /^T[DH]$/.test(from.nodeName) && !from.childNodes.length) from.innerHTML = "<br>";
+    if (!ed.lastElementChild || ed.lastElementChild !== ed.lastChild || ed.lastElementChild.matches("div.opts,div.flow,div.gantt,table")) { const p = document.createElement("p"); p.innerHTML = "<br>"; ed.appendChild(p); }
+  };
+  addEventListener("pointermove", move); addEventListener("pointerup", up); move(e);
+}
+
+/* 정보 패널: 비어 있으면 Backspace/Delete로 통째로 지우기, 맨 앞에서 Backspace면 패널만 풀고 글은 남기기 */
+function panelKeys(e){
+  if (e.isComposing || (e.key !== "Backspace" && e.key !== "Delete")) return false;
+  const s = getSelection(); if (!s.rangeCount || !s.isCollapsed) return false;
+  const n = s.anchorNode, pan = n && (n.nodeType === 1 ? n : n.parentElement).closest("div.panel"); if (!pan || !ed.contains(pan)) return false;
+  const empty = !pan.textContent.replace(/[\s\u00a0\u200b]/g, "") && !pan.querySelector("img,video,time,span.status,div.opts,div.flow,div.gantt,table");
+  const r = document.createRange(); r.setStart(pan, 0); r.setEnd(s.anchorNode, s.anchorOffset);
+  const atStart = !r.toString().replace(/[\u200b]/g, "").length;
+  if (!empty && !(e.key === "Backspace" && atStart)) return false;
+  e.preventDefault(); snapNow();
+  if (empty) { const p = document.createElement("p"); p.innerHTML = "<br>"; pan.replaceWith(p); caretIn(p); return true; }
+  const first = pan.firstChild; while (pan.firstChild) pan.before(pan.firstChild); pan.remove();
+  const c = document.createRange(); c.setStart(first && first.nodeType === 1 ? first : first.parentNode, 0); c.collapse(true); s.removeAllRanges(); s.addRange(c); return true;
+}
 
 /* ───────── 라우팅 ───────── */
 function parseHash(){ const h = decodeURIComponent(location.hash.replace(/^#\/?/, "")); const [a, b, c] = h.split("/");
@@ -2510,6 +2578,13 @@ function openEditor(p, isNew){
 function saveSel(){ const s = getSelection(); if (s.rangeCount && ed && ed.contains(s.anchorNode)) savedSel = s.getRangeAt(0).cloneRange(); }
 function restoreSel(){ if (!savedSel) { placeEnd(); return; } const s = getSelection(); s.removeAllRanges(); s.addRange(savedSel); }
 function placeEnd(){ ed.focus(); const r = document.createRange(); r.selectNodeContents(ed); r.collapse(false); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }
+/* 커서가 줄 안이 아니라 블록 사이(예: 표 바로 위 빈 틈)에 있으면 그 자리에 빈 줄을 만들어 커서를 넣기 */
+function gapCaret(){
+  const s = getSelection(); if (!s.rangeCount || !ed) return; const n = s.anchorNode;
+  if (!n || n.nodeType !== 1 || !(n === ed || n.matches("div.col,div.xbody,div.panel")) || !ed.contains(n)) return;
+  const at = n.childNodes[s.anchorOffset] || null; if (at && at.nodeType === 1 && at.tagName === "P" && !at.textContent.trim()) { caretIn(at); saveSel(); return; }
+  const p = document.createElement("p"); p.innerHTML = "<br>"; n.insertBefore(p, at); caretIn(p); saveSel();
+}
 function blockInBox(){ /* 커서가 있는 줄 (나란히 칸·접기 속·패널 안이면 그 안의 줄) */
   const s = getSelection(); if (!s.rangeCount || !ed) return null; let n = s.anchorNode; if (!ed.contains(n)) return null;
   while (n && n.parentNode && n.parentNode !== ed && !(n.parentNode.nodeType === 1 && n.parentNode.matches("div.col,div.xbody,div.panel"))) n = n.parentNode;
@@ -2517,7 +2592,7 @@ function blockInBox(){ /* 커서가 있는 줄 (나란히 칸·접기 속·패�
 }
 function curBlock(){ const s = getSelection(); if (!s.rangeCount) return null; let n = s.anchorNode; if (!ed.contains(n)) return null; while (n && n.parentNode !== ed) n = n.parentNode; return n; }
 function insertBlock(el, select){
-  restoreSel(); snapNow(); const b = blockInBox();
+  restoreSel(); snapNow(); gapCaret(); const b = blockInBox();
   if (b && b !== ed) { const empty = b.nodeType === 1 && b.tagName === "P" && !b.textContent.trim() && !b.querySelector("img,video"); empty ? b.replaceWith(el) : b.after(el); }
   else ed.appendChild(el);
   if (!el.nextSibling) { const p = document.createElement("p"); p.innerHTML = "<br>"; el.after(p); }
@@ -2554,7 +2629,7 @@ function wireEditor(id, isNew){
     else if (a === "table") { const t = document.createElement("table"); t.innerHTML = `<tbody>${[0, 1, 2].map(r => `<tr>${[0, 1, 2].map(() => r ? "<td><br></td>" : "<th><br></th>").join("")}</tr>`).join("")}</tbody>`; insertBlock(t, t.querySelector("th")); }
     else if (a === "panel") { const rect = btn.getBoundingClientRect();
       showMenu([{ head: "패널 종류" }, ...[["info", "정보 (파랑)"], ["note", "메모 (보라)"], ["ok", "성공 (초록)"], ["warn", "주의 (노랑)"], ["err", "오류 (빨강)"]].map(([k, l]) => ({ label: l, run: () => {
-        restoreSel(); snapNow(); const b = curBlock(), inPanel = b && b.nodeType === 1 && b.classList && b.classList.contains("panel");
+        restoreSel(); snapNow(); gapCaret(); const b = curBlock(), inPanel = b && b.nodeType === 1 && b.classList && b.classList.contains("panel");
         if (inPanel) { b.className = "panel " + k; return; }
         const d = document.createElement("div"); d.className = "panel " + k; const p = document.createElement("p");
         if (b && b.nodeType === 1 && b.tagName === "P" && b.textContent.trim()) { p.innerHTML = b.innerHTML; d.appendChild(p); b.replaceWith(d); const r = document.createRange(); r.selectNodeContents(p); r.collapse(false); getSelection().removeAllRanges(); getSelection().addRange(r); }
@@ -2599,8 +2674,11 @@ function wireEditor(id, isNew){
     const uk = !e.isComposing && undoKey(e); if (uk) { e.preventDefault(); doUndo(uk === "redo"); syncBar(); return; }
     if (pickState && pickKey(e)) return;
     if (listKeys(e)) { syncBar(); return; }
+    if (panelKeys(e)) { syncBar(); return; }
     if (e.key === "Enter" && !e.isComposing) snapNow();
     if (!e.isComposing && editKeys(e)) return;
+    if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { /* --- 또는 *** 치고 Enter → 구분선 */
+      const hb = nearBlock(); if (hb && /^(P|DIV)$/.test(hb.tagName) && /^(-{3,}|\*{3,}|_{3,})$/.test(hb.textContent.replace(/[\u200b\u00a0\s]/g, ""))) { e.preventDefault(); hb.innerHTML = "<br>"; convertBlock(hb, "---"); syncBar(); return; } }
     if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
       const s = getSelection(), n = s.anchorNode, pre = n && (n.nodeType === 1 ? n : n.parentElement).closest("pre");
       if (pre && ed.contains(pre)) { e.preventDefault(); document.execCommand("insertText", false, "\n"); return; }
@@ -2617,7 +2695,9 @@ function wireEditor(id, isNew){
   });
   ed.addEventListener("input", e => richInput(e, true));
 ;
+  ed.addEventListener("pointerdown", e => { const h = e.target.closest("[data-bdrag]"); if (h && ed.contains(h)) startBlockDrag(e, h.closest("div.opts,div.flow,div.gantt")); }, true);
   ed.addEventListener("click", e => {
+    if (e.target.closest("[data-bdrag]")) { e.preventDefault(); return; }
     const ob = e.target.closest("div.opts"); if (ob && ed.contains(ob)) { if (e.target.closest("[data-oopen]") || !e.target.closest("tr.hasd")) openOptsEditor(ob); return; }
     const fb = e.target.closest("div.flow,div.gantt"); if (fb && ed.contains(fb)) { if (e.target.closest("[data-fopen],[data-gopen]") || !e.target.closest(".fc-bar,.gt-bar-top,[data-gi],.fc-tip")) { fb.classList.contains("flow") ? openFlowEditor(fb) : openGanttEditor(fb); } return; }
     const chip = e.target.closest("time.date,span.status"); if (chip && ed.contains(chip)) { chip.tagName === "TIME" ? openDatePop(chip, true) : openStatusPop(chip); return; }

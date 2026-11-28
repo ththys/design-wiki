@@ -202,3 +202,8 @@
 ### 행간 · 웹에서 끌어온 이미지 (최근)
 - 툴바 `#lhSel`: 고른 줄(P/H/LI)에 `lh-1`(좁게 1.35) / 기본 1.75 / `lh-3`(넓게 2.1) / `lh-4`(아주 넓게 2.6). `setLineHeight`, `blocksInSel`. sanitize가 P/H/LI의 `lh-[134]` 유지. snapNow로 되돌리기 가능.
 - 다른 탭·사이트에서 끌어온 맨 `<img>`: `wrapStrayMedia`가 `span.ifig`(줄·표 칸 안) 또는 `figure`로 감쌈 → 크기 제한·편집 막대·드래그 크기 조절. drop(파일 아님)·붙여넣기·클릭·prepEditor에서 호출. CSS `.doc img,.doc video{max-width:100%}`.
+- 옵션 패널·플로우·간트 블록 위 `⠿ 옮기기`(`startBlockDrag`): 끌어서 표 칸 안이나 줄 사이로 옮김. 되돌리기 가능.
+- 정보 패널: 비었으면 Backspace/Delete로 지워짐, 맨 앞 Backspace는 패널만 풀림 (`panelKeys`).
+- 옵션 설명은 줄 아래로 펼치지 않고 떠 있는 메모 상자 `#optTip` (누르면 고정, 바깥 누르면 닫힘).
+- `---`/`***` 치고 Enter → 구분선.
+- 블록 사이 빈 틈(표 바로 위 등)에 커서가 있어도 `gapCaret`가 빈 줄을 만들어 그 자리에 넣음.

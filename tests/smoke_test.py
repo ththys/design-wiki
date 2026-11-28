@@ -479,7 +479,7 @@ with sync_playwright() as p:
     pg.keyboard.press("Control+z"); pg.wait_for_timeout(100); undo_ok = pg.locator("#ed span.ifig").count() == 2
     pg.evaluate("document.querySelector('#ed').focus()"); pg.keyboard.press("Control+s"); pg.wait_for_timeout(400)
     view = pg.locator("#pDoc .cols.fit figure img").count() == 1 and pg.locator("#pDoc .cols.fit .opv").count() == 1 and pg.locator("#pDoc p span.ifig img").count() == 2 and pg.locator("#pDoc .opv").count() == 2
-    pg.locator("#pDoc .opv-t tr.hasd").first.hover(); pg.wait_for_timeout(50); tip = pg.locator("#pDoc .opv-t tr.od", has_text="대상을 보지 않음").first.is_visible()
+    pg.locator("#pDoc .opv-t tr.hasd").first.hover(); pg.wait_for_timeout(50); tip = pg.locator("#optTip", has_text="대상을 보지 않음").is_visible() and not pg.locator("#pDoc .opv-t tr.od").first.is_visible()
     srch = "DoNotLookAtTarget" in pg.evaluate("(JSON.parse(localStorage.getItem('wiki-v1')).pages.find(p=>p.title==='옵션 시험')||{}).text || ''")
     check("옵션 패널(기본·엑셀 붙여넣기·설명)·나란히(이미지|패널)·글 사이 이미지 2장·한 줄 전환·되돌리기·검색", dflt and pasted and in_ed and img_in_col and opt_in_col and two_inline and tog and undo_ok and view and tip and srch,
           f"{dflt},{pasted},{in_ed},{img_in_col},{opt_in_col},{two_inline},{tog},{undo_ok},{view},{tip},{srch}")
@@ -525,6 +525,48 @@ with sync_playwright() as p:
     pg.keyboard.press("Control+z"); pg.wait_for_timeout(80); lhu = pg.evaluate("sanitize(document.querySelector('#ed').innerHTML)")
     check("웹에서 끌어온 맨 이미지도 칸 안에·편집 막대 / 행간 넓게(여러 줄·목록)·되돌리기",
           stray and fits and lh == '<p class="lh-3">첫 줄</p><p class="lh-3">둘째 줄</p><ul><li class="lh-3">목록</li></ul>' and "lh-" not in lhu, f"{stray},{fits},{lh},{lhu}")
+    pg.click("#edCancel"); pg.wait_for_timeout(100)
+    if pg.locator("#askOk").count(): pg.click("#askOk"); pg.wait_for_timeout(200)
+
+    # 30) 옵션 패널을 끌어서 표 칸에 넣기
+    pg.goto(URL + "#/"); pg.wait_for_timeout(150); pg.click("#createBtn"); pg.wait_for_timeout(250); pg.fill("#edTitle", "끌기 시험"); pg.click("#ed")
+    pg.evaluate("(() => { const e = document.querySelector('#ed'); const d = JSON.stringify({ title: 'MoveClockWise', rows: [{ n: 'TimeOut', t: 'num', v: '1000' }] }).replace(/\"/g, '&quot;'); e.innerHTML = sanitize('<table><tbody><tr><th>이름</th><th>예시</th></tr><tr><td>회전</td><td><br></td></tr></tbody></table><div class=\"opts\" data-opts=\"' + d + '\"></div><p>끝</p>'); prepEditor(e); })()")
+    pg.wait_for_timeout(150); pg.hover("#ed div.opts"); h = pg.locator("#ed div.opts [data-bdrag]").bounding_box(); c = pg.locator("#ed td").nth(1).bounding_box()
+    pg.mouse.move(h["x"] + 5, h["y"] + 5); pg.mouse.down(); pg.mouse.move(c["x"] + 20, c["y"] + 10, steps=6); pg.mouse.up(); pg.wait_for_timeout(150)
+    inCell = pg.locator("#ed td div.opts").count() == 1 and pg.locator(".modal").count() == 0
+    saved = pg.evaluate("sanitize(document.querySelector('#ed').innerHTML)")
+    pg.keyboard.press("Control+z"); pg.wait_for_timeout(100); back = pg.locator("#ed td div.opts").count() == 0
+    check("옵션 패널을 끌어서 표 칸에 넣기·저장·되돌리기", inCell and '<td><div class="opts"' in saved and back, f"{inCell},{back},{saved[:300]}")
+    pg.click("#edCancel"); pg.wait_for_timeout(100)
+    if pg.locator("#askOk").count(): pg.click("#askOk"); pg.wait_for_timeout(200)
+
+    # 31) 빈 정보 패널 지우기 / 맨 앞 Backspace로 패널 풀기
+    pg.goto(URL + "#/"); pg.wait_for_timeout(150); pg.click("#createBtn"); pg.wait_for_timeout(250); pg.fill("#edTitle", "패널 지우기"); pg.click("#ed")
+    pg.evaluate("(() => { const e = document.querySelector('#ed'); e.innerHTML = '<p>위</p><div class=\"panel info\"><p><br></p></div><div class=\"panel note\"><p>글</p></div><p>끝</p>'; caretIn(e.querySelector('.panel p')); })()")
+    pg.keyboard.press("Backspace"); pg.wait_for_timeout(80)
+    one = pg.locator("#ed div.panel").count() == 1
+    pg.evaluate("(() => { const p = document.querySelector('#ed .panel p'); const r = document.createRange(); r.setStart(p.firstChild, 0); getSelection().removeAllRanges(); getSelection().addRange(r); })()")
+    pg.keyboard.press("Backspace"); pg.wait_for_timeout(80)
+    html = pg.evaluate("sanitize(document.querySelector('#ed').innerHTML)")
+    check("빈 패널 Backspace로 지우기 / 맨 앞 Backspace는 패널만 풀기", one and "panel" not in html and "<p>글</p>" in html, f"{one},{html}")
+    pg.click("#edCancel"); pg.wait_for_timeout(100)
+    if pg.locator("#askOk").count(): pg.click("#askOk"); pg.wait_for_timeout(200)
+
+    # 32) --- 치고 Enter → 구분선
+    pg.goto(URL + "#/"); pg.wait_for_timeout(150); pg.click("#createBtn"); pg.wait_for_timeout(250); pg.fill("#edTitle", "구분선"); pg.click("#ed")
+    pg.evaluate("(() => { const e = document.querySelector('#ed'); e.innerHTML = '<p>위</p><p><br></p>'; caretIn(e.querySelectorAll('p')[1]); })()")
+    pg.keyboard.type("---"); pg.keyboard.press("Enter"); pg.wait_for_timeout(80); pg.keyboard.type("아래")
+    html = pg.evaluate("sanitize(document.querySelector('#ed').innerHTML)")
+    check("--- 치고 Enter → 구분선", html == "<p>위</p><hr><p>아래</p>", html)
+    pg.click("#edCancel"); pg.wait_for_timeout(100)
+    if pg.locator("#askOk").count(): pg.click("#askOk"); pg.wait_for_timeout(200)
+
+    # 33) 표 바로 위 빈 틈에 커서 → 패널·결정 넣기
+    pg.goto(URL + "#/"); pg.wait_for_timeout(150); pg.click("#createBtn"); pg.wait_for_timeout(250); pg.fill("#edTitle", "틈"); pg.click("#ed")
+    pg.evaluate("(() => { const e = document.querySelector('#ed'); e.innerHTML = '<p>위</p><table><tbody><tr><td>a</td></tr></tbody></table><p>끝</p>'; const r = document.createRange(); r.setStart(e, 1); getSelection().removeAllRanges(); getSelection().addRange(r); saveSel(); })()")
+    pg.evaluate("insertBlock((() => { const u = document.createElement('ul'); u.className = 'decision'; u.innerHTML = '<li><br></li>'; return u; })(), null)")
+    html = pg.evaluate("sanitize(document.querySelector('#ed').innerHTML)")
+    check("표 바로 위 빈 틈에서도 블록이 그 자리에", html.startswith('<p>위</p><ul class="decision">') and html.index("decision") < html.index("<table"), html)
     pg.click("#edCancel"); pg.wait_for_timeout(100)
     if pg.locator("#askOk").count(): pg.click("#askOk"); pg.wait_for_timeout(200)
     check("자바스크립트 오류 없음", not errs, "; ".join(errs[:3]))
