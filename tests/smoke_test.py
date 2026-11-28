@@ -498,6 +498,19 @@ with sync_playwright() as p:
     pg.locator('#lmBox .fc-node[data-id="plm_bt"]').dblclick(); pg.wait_for_timeout(300)
     went = pg.evaluate("location.hash") == "#/p/lm_bt" and pg.locator("#scrim .modal").count() == 0
     check("🕸 연결 보기: 링크해 온 곳|이 페이지|링크한 곳·위/하위 끄기·두 번 눌러 이동", ok1 and nofam and went, f"{n1},{lanes},{nofam},{went}")
+
+    # 28) 표 칸에 이미지 + 모서리 끌어서 크기 바꾸기
+    pg.goto(URL + "#/"); pg.wait_for_timeout(150); pg.click("#createBtn"); pg.wait_for_timeout(250); pg.fill("#edTitle", "표 이미지"); pg.click("#ed")
+    pg.click('#edbar [data-act="table"]'); pg.wait_for_timeout(100); pg.locator("#ed td").first.click(); pg.set_input_files("#edFile", png); pg.wait_for_timeout(400)
+    in_td = pg.locator("#ed td img").count() == 1
+    pg.locator("#ed td img").click(); pg.wait_for_timeout(150); bars = pg.locator(".figbar").count() == 1 and pg.locator(".figrz").count() == 1
+    w0 = pg.evaluate("document.querySelector('#ed td img').getBoundingClientRect().width"); bb = pg.locator(".figrz").bounding_box()
+    pg.mouse.move(bb["x"] + 7, bb["y"] + 7); pg.mouse.down(); pg.mouse.move(bb["x"] + 80, bb["y"] + 7, steps=5); pg.mouse.up(); pg.wait_for_timeout(100)
+    w1 = pg.evaluate("document.querySelector('#ed td img').getBoundingClientRect().width")
+    pg.keyboard.press("Control+z"); pg.wait_for_timeout(80); wu = pg.evaluate("document.querySelector('#ed td img').getBoundingClientRect().width"); pg.keyboard.press("Control+y"); pg.wait_for_timeout(80)
+    pg.evaluate("document.querySelector('#ed').focus()"); pg.keyboard.press("Control+s"); pg.wait_for_timeout(400)
+    wv = pg.evaluate("document.querySelector('#pDoc td img').getBoundingClientRect().width")
+    check("표 칸에 이미지·그림 막대·모서리 끌어 크기·되돌리기·저장 후 유지", in_td and bars and w1 > w0 + 40 and abs(wu - w0) < 2 and abs(wv - w1) < 2, f"{in_td},{bars},{w0},{w1},{wu},{wv}")
     check("자바스크립트 오류 없음", not errs, "; ".join(errs[:3]))
     b.close()
 srv.shutdown()

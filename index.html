@@ -295,6 +295,11 @@ body.rzing{cursor:col-resize;user-select:none} body.rzing *{cursor:col-resize!im
 .editor:empty::before,.editor>p:only-child:has(br:only-child)::before{content:"내용을 입력하세요. / 를 눌러 표·패널·이미지 등을 넣을 수 있어요";color:var(--muted);pointer-events:none}
 .editor figure{position:relative}
 .editor figure.sel img,.editor figure.sel video{outline:2px solid var(--brand);outline-offset:2px}
+.figrz{position:fixed;z-index:17;width:14px;height:14px;background:var(--brand);border:2px solid #fff;border-radius:3px;cursor:nwse-resize;box-shadow:0 1px 4px rgba(0,0,0,.3)}
+body.figsizing .figrz::after{content:attr(data-w);position:absolute;left:18px;top:-4px;background:var(--ink);color:var(--bg);font-size:11px;padding:1px 6px;border-radius:3px;white-space:nowrap}
+body.figsizing,body.figsizing *{cursor:nwse-resize!important;user-select:none}
+.doc img[width],.doc video[width]{height:auto!important;max-width:100%}
+.doc td span.ifig img:not([width]),.doc th span.ifig img:not([width]){max-height:160px}
 .figbar{position:absolute;z-index:16;display:flex;gap:2px;background:var(--ink);border-radius:4px;padding:3px}
 .figbar button{border:0;background:none;color:var(--bg);font-size:12px;padding:4px 8px;border-radius:3px;cursor:pointer}
 .figbar button:hover,.figbar button.on{background:rgba(255,255,255,.2)}
@@ -762,6 +767,7 @@ function sanitize(html){
         const m = doc.createElement(t); m.setAttribute("src", src);
         if (t === "VIDEO") { m.setAttribute("controls", ""); m.setAttribute("loop", ""); m.setAttribute("muted", ""); m.setAttribute("playsinline", ""); }
         else m.setAttribute("alt", n.getAttribute("alt") || "");
+        const wv = parseInt(n.getAttribute("width")); if (wv >= 16 && wv <= 2400) m.setAttribute("width", wv);
         if (out.tagName === "FIGURE" || (out.tagName === "SPAN" && out.classList.contains("ifig"))) { out.appendChild(m); return; }
         const f = doc.createElement("figure"); f.appendChild(m); out.appendChild(f); return;
       }
@@ -891,7 +897,7 @@ function restoreSnap(h){
   ed.querySelectorAll(".pk-anchor").forEach(x => x.remove()); prepEditor(ed); fixLinks(ed); saveSel();
 }
 function doUndo(redo){
-  const u = U(); if (!u) return; closePicker(); closePop(); document.querySelectorAll(".tblbar,.figbar").forEach(x => x.remove());
+  const u = U(); if (!u) return; closePicker(); closePop(); document.querySelectorAll(".tblbar,.figbar,.figrz").forEach(x => x.remove());
   const from = redo ? u.r : u.u, to = redo ? u.u : u.r; if (!from.length) { toast(redo ? "다시 할 게 없어요" : "더 되돌릴 게 없어요"); return; }
   const [n, o] = curCaret(); to.push(snapHTML(n, o)); restoreSnap(from.pop()); u.at = 0;
 }
@@ -2032,7 +2038,8 @@ function openOptsEditor(block, isNew){
 function inlineSpot(){ /* 글이 있는 줄 가운데면 글 사이에 넣음 */
   const s = getSelection(); if (!s.rangeCount || !ed || !ed.contains(s.anchorNode)) return null; const n = s.anchorNode, el = n.nodeType === 1 ? n : n.parentElement;
   const b = el.closest("p,li,td,th,h1,h2,h3,h4,h5,h6"); if (!b || !ed.contains(b) || b.classList.contains("xtitle")) return null;
-  return b.textContent.replace(/[\s ​]/g, "") || b.querySelector("span.ifig") ? b : null;
+  if (/^T[DH]$/.test(b.tagName)) return b; /* 표 칸은 비어 있어도 칸 안에 */
+  return b.textContent.replace(/[\s\u00a0\u200b]/g, "") || b.querySelector("span.ifig") ? b : null;
 }
 function toggleInline(f){ /* 한 줄 차지 ↔ 글 사이 */
   snapNow();
@@ -2434,7 +2441,7 @@ function showEditor(id){
 let curSave = null; /* 지금 편집 중인 페이지 저장 (Ctrl+S·Ctrl+Enter, 제목 칸 등 편집기 밖에서도) */
 document.addEventListener("keydown", e => { if (!curSave || !editing || !(e.ctrlKey || e.metaKey) || e.altKey || !$("#scrim").hidden || (ed && ed.contains(e.target))) return;
   if ((!e.shiftKey && e.code === "KeyS") || e.code === "Enter" || e.code === "NumpadEnter") { e.preventDefault(); curSave(); } });
-function stopEdit(){ curSave = null; editing = null; clearInterval(draftT); ed = null; document.querySelectorAll(".figbar,.tblbar").forEach(x => x.remove()); selFigEl = null; }
+function stopEdit(){ curSave = null; editing = null; clearInterval(draftT); ed = null; document.querySelectorAll(".figbar,.tblbar,.figrz").forEach(x => x.remove()); selFigEl = null; }
 const draftKey = id => "wiki-draft:" + id;
 function editDirty(){ if (!ed) return false; return (edTitle.value + "\u0001" + sanitize(ed.innerHTML)) !== edBase; }
 function openEditor(p, isNew){
@@ -2629,18 +2636,28 @@ function wireEditor(id, isNew){
 /* 그림 선택: 크기·삭제 */
 let selFigEl = null;
 function selectFig(f){
-  document.querySelectorAll(".figbar").forEach(x => x.remove()); if (selFigEl) selFigEl.classList.remove("sel"); selFigEl = f; if (!f) return;
+  document.querySelectorAll(".figbar,.figrz").forEach(x => x.remove()); if (selFigEl) selFigEl.classList.remove("sel"); selFigEl = f; if (!f || !f.isConnected) { selFigEl = null; return; }
   f.classList.add("sel"); const bar = document.createElement("div"); bar.className = "figbar";
-  const cur = f.classList.contains("w-s") ? "s" : f.classList.contains("w-m") ? "m" : "l", isIn = f.tagName === "SPAN";
+  const media = f.querySelector("img,video"), fixedW = media && media.getAttribute("width");
+  const cur = fixedW ? "" : f.classList.contains("w-s") ? "s" : f.classList.contains("w-m") ? "m" : "l", isIn = f.tagName === "SPAN";
   bar.innerHTML = `<button data-w="s" class="${cur === "s" ? "on" : ""}">작게</button><button data-w="m" class="${cur === "m" ? "on" : ""}">중간</button><button data-w="l" class="${cur === "l" ? "on" : ""}">원래 크기</button><button data-inl>${isIn ? "한 줄 차지" : "글 사이로"}</button>${isIn ? "" : "<button data-cap>설명</button>"}<button data-del>삭제</button>`;
-  document.body.appendChild(bar); const r = f.querySelector("img,video").getBoundingClientRect();
-  bar.style.position = "fixed"; bar.style.left = (r.left + 6) + "px"; bar.style.top = Math.max(110, r.top + 6) + "px";
+  document.body.appendChild(bar); const r = media.getBoundingClientRect();
+  bar.style.position = "fixed"; bar.style.left = Math.max(4, Math.min(r.left, innerWidth - bar.offsetWidth - 8)) + "px"; bar.style.top = (r.top - 40 > 104 ? r.top - 40 : Math.max(104, r.bottom + 6)) + "px";
+  /* 오른쪽 아래 모서리를 끌어서 크기 바꾸기 (비율 그대로) */
+  const rz = document.createElement("div"); rz.className = "figrz"; rz.title = "끌어서 크기 바꾸기"; document.body.appendChild(rz);
+  const placeRz = () => { const q = media.getBoundingClientRect(); rz.style.left = (q.right - 7) + "px"; rz.style.top = (q.bottom - 7) + "px"; rz.dataset.w = Math.round(q.width) + "px"; };
+  placeRz();
+  rz.addEventListener("pointerdown", e => { e.preventDefault(); e.stopPropagation(); snapNow(); bar.style.visibility = "hidden";
+    const x0 = e.clientX, w0 = media.getBoundingClientRect().width; document.body.classList.add("figsizing");
+    const mv = ev => { const w = Math.max(24, Math.min(2400, Math.round(w0 + (ev.clientX - x0)))); f.classList.remove("w-s", "w-m", "w-l"); media.setAttribute("width", w); placeRz(); };
+    const up = () => { removeEventListener("pointermove", mv); removeEventListener("pointerup", up); document.body.classList.remove("figsizing"); selectFig(f); };
+    addEventListener("pointermove", mv); addEventListener("pointerup", up); });
   bar.addEventListener("mousedown", e => { e.preventDefault(); if (e.target.closest("button")) snapNow(); });
   bar.onclick = e => { const b = e.target.closest("button"); if (!b) return;
     if (b.hasAttribute("data-inl")) { const nf = toggleInline(f); selectFig(nf); return; }
-    if (b.dataset.w) { f.classList.remove("w-s", "w-m", "w-l"); if (b.dataset.w !== "l" || isIn) f.classList.add("w-" + b.dataset.w); }
+    if (b.dataset.w) { media.removeAttribute("width"); f.classList.remove("w-s", "w-m", "w-l"); if (b.dataset.w !== "l" || isIn) f.classList.add("w-" + b.dataset.w); }
     else if (b.hasAttribute("data-cap")) { let c = f.querySelector("figcaption"); askText("이미지 설명", c ? c.textContent : "", v => { if (!c) { c = document.createElement("figcaption"); f.appendChild(c); } c.textContent = v; if (!v) c.remove(); }); return; }
-    else if (b.hasAttribute("data-del")) { f.remove(); selFigEl = null; bar.remove(); return; }
+    else if (b.hasAttribute("data-del")) { f.remove(); selFigEl = null; bar.remove(); rz.remove(); return; }
     selectFig(f); };
 }
 document.addEventListener("scroll", () => { if (selFigEl) selectFig(selFigEl); }, true);

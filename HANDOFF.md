@@ -26,7 +26,7 @@
 |---|---|
 | 로컬로 보기 | `python3 -m http.server` 후 `http://localhost:8000/index.html?local` (`?local` = 클라우드 없이 이 브라우저에만 저장) |
 | 문법 확인 | `node -e "const s=require('fs').readFileSync('index.html','utf8');[...s.matchAll(/<script>([\s\S]*?)<\/script>/g)].forEach(x=>new Function(x[1]));console.log('ok')"` |
-| 스모크 테스트 | `python3 tests/smoke_test.py` (Playwright + Chromium 필요, 50개 항목, 로컬 모드. 마지막 줄 `OK`) |
+| 스모크 테스트 | `python3 tests/smoke_test.py` (Playwright + Chromium 필요, 51개 항목, 로컬 모드. 마지막 줄 `OK`) |
 | 배포 | `git push` → GitHub Pages가 자동 배포. 확인: `gh api "repos/ththys/design-wiki/actions/runs?per_page=1" --jq '.workflow_runs[0]\|.head_sha+" "+.status+" "+(.conclusion//"")'` |
 
 - 커밋 메시지: 한국어 한 줄로 무엇이 바뀌었는지.
@@ -81,7 +81,7 @@
 - 특별한 모양: 패널 `div.panel.(info|note|warn|ok|err)`, 할 일 `ul.check > li(.done)`, 페이지 링크 `a.plink[data-page=id]`, 그림 크기 `figure.w-s|w-m`. 이미지·영상 주소는 `https://` 또는 `data:image/`만.
 - **연결 보기** (페이지 위 `🕸 연결` → `openLinkMap()`): 페이지 `links`(본문 링크·불러오기·차트 링크)와 그 반대(링크해 온 곳), 위·하위 페이지로 그래프를 만들어 `mountFlow()`로 그림. 1단계는 ‘링크해 온 곳 | 이 페이지 | 링크한 곳’ 3열, 2단계는 자동 배치, 최대 60개. 두 번 누르면 그 페이지로.
 - **옵션 패널** `div.opts[data-opts]` = `{title, rows:[{n 이름, t text|num|check|enum|head, v 값(check는 true/false), d 설명}]}` — 설정 창 예시를 그려 주는 블록(`/options`). `mountOpts()`가 그림, 설명 있는 줄은 마우스 올리면/누르면 아래 줄로 보임. 편집 `openOptsEditor()`(표, 엑셀 붙여 넣기: 이름·값·설명, 값 모양으로 칸 종류 추측).
-- **글 사이 이미지** `span.ifig.w-s|w-m|w-l > img` — 글이 있는 줄에서 이미지를 넣으면 그 자리에 글자처럼 들어감(`inlineSpot()`), 빈 줄이면 예전처럼 `figure`. 그림 막대 ‘한 줄 차지 ↔ 글 사이로’(`toggleInline`).
+- **글 사이 이미지** `span.ifig.w-s|w-m|w-l > img` — 글이 있는 줄에서 이미지를 넣으면 그 자리에 글자처럼 들어감(`inlineSpot()`), 빈 줄이면 예전처럼 `figure`. 그림 막대 ‘한 줄 차지 ↔ 글 사이로’(`toggleInline`). 표 칸에서는 비어 있어도 칸 안에 넣음. 이미지를 누르면 오른쪽 아래 파란 모서리(`.figrz`)를 끌어 크기 조절 → `img[width]`로 저장(16~2400).
 - **나란히 놓기** `div.cols.c2.fit` — 칸 넓이가 내용 크기대로(`/side`). `insertBlock()`은 이제 `blockInBox()`로 나란히 칸·접기 속·패널 안에 그대로 넣음.
 - **오른쪽 위 바로가기**: 관리자가 페이지 ⋯ 메뉴 ‘오른쪽 위 바로가기에 넣기’로 고른 페이지(최대 6개)가 🔔 왼쪽에 제목 링크로 보임. `wiki_meta/settings.quickLinks`(로컬 `wiki-qlinks`). 우클릭: 새 탭·순서·빼기. (용어 설명집 옆 패널은 사용자가 원치 않아 없앰)
 - **목록·들여쓰기 키** (`listKeys()`, 페이지·댓글 공용): Tab=목록 항목 한 칸 들여쓰기(앞 항목 아래 하위 목록) / 보통 줄 `in-1~6` / 표 다음 칸(끝이면 줄 추가), Shift+Tab=반대(맨 바깥이면 그 자리 보통 줄), 항목 맨 앞 Backspace=글머리만 없애고 그 자리에 보통 줄(`liftLi(li,true)`, `in-1`로 글자 위치 유지; 하위 항목은 한 칸 바깥으로), 빈 항목 Enter=내어쓰기·목록 끝내기.
