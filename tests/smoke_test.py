@@ -483,6 +483,21 @@ with sync_playwright() as p:
     srch = "DoNotLookAtTarget" in pg.evaluate("(JSON.parse(localStorage.getItem('wiki-v1')).pages.find(p=>p.title==='옵션 시험')||{}).text || ''")
     check("옵션 패널(기본·엑셀 붙여넣기·설명)·나란히(이미지|패널)·글 사이 이미지 2장·한 줄 전환·되돌리기·검색", dflt and pasted and in_ed and img_in_col and opt_in_col and two_inline and tog and undo_ok and view and tip and srch,
           f"{dflt},{pasted},{in_ed},{img_in_col},{opt_in_col},{two_inline},{tog},{undo_ok},{view},{tip},{srch}")
+
+    # 27) 연결 보기
+    pg.evaluate("""() => { const d = JSON.parse(localStorage.getItem('wiki-v1')); const L = (i,t) => `<a class="plink" data-page="${i}" href="#/p/${i}">${t}</a>`;
+      const P = (id,title,html,parent,links) => ({id,title,html,text:'',parent:parent||null,order:200,links:links||[],createdAt:1,updatedAt:1,version:1});
+      d.pages.push(P('lm_cw','MoveClockWise',`<p>${L('lm_tg','타겟')} ${L('lm_sp','이동 속도')} ${L('lm_bt','BT Task')}</p>`,null,['lm_tg','lm_sp','lm_bt']), P('lm_tg','타겟','<p>대상</p>'), P('lm_sp','이동 속도','<p>속도</p>'), P('lm_bt','BT Task','<p>태스크</p>'),
+        P('lm_boss','보스 B',`<p>${L('lm_cw','MoveClockWise')}</p>`,null,['lm_cw']), P('lm_child','하위 메모','<p>x</p>','lm_cw'));
+      localStorage.setItem('wiki-v1', JSON.stringify(d)); }""")
+    pg.goto(URL + "#/p/lm_cw"); pg.reload(); pg.wait_for_timeout(300); pg.click("#pMap"); pg.wait_for_timeout(300)
+    names = lambda: sorted(x.split("\n")[0].strip() for x in pg.locator("#lmBox .fc-node .fc-t").all_inner_texts())
+    n1 = names(); lanes = [x.strip() for x in pg.locator("#lmBox .fc-lane").all_inner_texts()]
+    ok1 = all(any(k in n for n in n1) for k in ["MoveClockWise", "타겟", "이동 속도", "BT Task", "보스 B", "하위 메모"]) and len(lanes) == 3
+    pg.uncheck("#lmFam"); pg.wait_for_timeout(200); nofam = not any("하위 메모" in n for n in names())
+    pg.locator('#lmBox .fc-node[data-id="plm_bt"]').dblclick(); pg.wait_for_timeout(300)
+    went = pg.evaluate("location.hash") == "#/p/lm_bt" and pg.locator("#scrim .modal").count() == 0
+    check("🕸 연결 보기: 링크해 온 곳|이 페이지|링크한 곳·위/하위 끄기·두 번 눌러 이동", ok1 and nofam and went, f"{n1},{lanes},{nofam},{went}")
     check("자바스크립트 오류 없음", not errs, "; ".join(errs[:3]))
     b.close()
 srv.shutdown()

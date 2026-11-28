@@ -2042,6 +2042,55 @@ function toggleInline(f){ /* 한 줄 차지 ↔ 글 사이 */
   f.remove(); if (b.tagName === "P" && !b.textContent.replace(/[\s ​]/g, "") && !b.querySelector("img,video,span")) b.replaceWith(fig); else b.after(fig); return fig;
 }
 
+/* ───────── 연결 보기 (페이지 링크를 플로우차트처럼) ───────── */
+const linksOfPage = p => (p && (p.links || linksOf(p.html || ""))) || [];
+function linkMapData(id, depth, family){
+  const center = byId(id); if (!center) return null; const MAX = 60;
+  const back = {}; pages.forEach(p => linksOfPage(p).forEach(t => { (back[t] = back[t] || []).push(p.id); }));
+  const nodes = new Map(), edges = [], seenE = new Set();
+  const addN = (pid, extra) => { if (!byId(pid) || (nodes.size >= MAX && !nodes.has(pid))) return false; if (!nodes.has(pid)) nodes.set(pid, extra || {}); return true; };
+  const addE = (a, b, kind) => { const k = a + ">" + b; if (a === b || seenE.has(k) || !nodes.has(a) || !nodes.has(b)) return; seenE.add(k); edges.push({ a, b, kind }); };
+  addN(id, { center: true });
+  let frontier = [id];
+  for (let d = 0; d < depth; d++) { const next = [];
+    frontier.forEach(x => {
+      linksOfPage(byId(x)).forEach(t => { if (addN(t)) { addE(x, t, "out"); next.push(t); } });
+      (back[x] || []).forEach(f => { if (addN(f)) { addE(f, x, "in"); next.push(f); } });
+      if (family) { const px = byId(x); if (px && px.parent && addN(px.parent)) { addE(px.parent, x, "fam"); next.push(px.parent); }
+        kids(x).forEach(c => { if (addN(c.id)) { addE(x, c.id, "fam"); next.push(c.id); } }); }
+    });
+    frontier = [...new Set(next)];
+  }
+  nodes.forEach((_, a) => { linksOfPage(byId(a)).forEach(b => addE(a, b, "out")); }); /* 보이는 것끼리의 링크도 */
+  const snippet = p => { let t = p.text || ""; if (!t || /<[a-z]/i.test(t)) t = plainOf(p.html || ""); return t.replace(/\s+/g, " ").trim().slice(0, 60); };
+  const fn = [...nodes].map(([pid, ex]) => { const p = byId(pid), path = pathOf(p).slice(0, -1).map(x => x.title || "제목 없음").join(" / ");
+    const n = { id: "p" + pid, t: p.title || "제목 없음", lp: pid, d: snippet(p) }; if (path) n.sub = path;
+    if (ex.center) { n.c = "orange"; } return n; });
+  if (depth === 1) { /* 1단계: 링크해 온 곳 | 이 페이지 | 링크한 곳 으로 줄 맞춤 */
+    const outs = new Set(edges.filter(e => e.a === id && e.kind !== "in").map(e => e.b)), ins = new Set(edges.filter(e => e.b === id).map(e => e.a));
+    fn.forEach(n => { const pid = n.lp; n.col = pid === id ? 2 : ins.has(pid) && !outs.has(pid) ? 1 : 3; });
+  }
+  return cleanFlow({ dir: "h", lanes: depth === 1 ? ["링크해 온 곳·위 페이지", "이 페이지", "링크한 곳·하위 페이지"] : [], nodes: fn,
+    edges: edges.map(e => ({ a: "p" + e.a, b: "p" + e.b, st: e.kind === "fam" ? "dash" : "", c: e.kind === "fam" ? "grey" : "", l: e.kind === "fam" ? "하위" : "" })) });
+}
+function openLinkMap(id){
+  const p = byId(id); if (!p) return; let depth = 1, family = true;
+  modal(`<header class="fe-hd"><h2>🕸 연결 보기 · ${esc(p.title || "제목 없음")}</h2><div class="fe-tools">
+      <button class="btn sm" data-lm="d1">1단계</button><button class="btn sm" data-lm="d2">2단계</button>
+      <label style="display:flex;align-items:center;gap:4px;font-size:13px;margin-left:8px"><input type="checkbox" id="lmFam" checked> 위·하위 페이지도</label></div>
+      <span class="grow"></span><small class="fe-mut" style="margin-right:8px">누르면 경로 강조 · 두 번 누르면 그 페이지로</small><button class="btn subtle" data-close>닫기</button></header>
+    <div class="mb" style="padding:12px 18px 18px;flex:1;overflow:auto"><div id="lmBox"></div></div>`, "xl");
+  const m = $("#scrim .modal"); m.classList.add("lmap");
+  const draw = () => { const d = linkMapData(id, depth, family); m.querySelectorAll("[data-lm]").forEach(b => b.classList.toggle("primary", b.dataset.lm === "d" + depth));
+    const box = $("#lmBox"); box.innerHTML = ""; const v = document.createElement("div"); box.appendChild(v);
+    if (d.nodes.length <= 1) { v.innerHTML = `<div class="empty"><b>연결된 페이지가 없어요</b>본문에서 [[ 로 다른 페이지를 링크하면 여기 이어져요.</div>`; return; }
+    mountFlow(v, d, { big: true }); };
+  m.addEventListener("click", e => { const b = e.target.closest("[data-lm]"); if (b) { depth = +b.dataset.lm.slice(1); draw(); } if (e.target.closest("[data-go]")) setTimeout(closeModal, 0); });
+  m.addEventListener("dblclick", e => { if (e.target.closest(".fc-node")) setTimeout(closeModal, 0); });
+  $("#lmFam").onchange = e => { family = e.target.checked; draw(); };
+  draw();
+}
+
 /* ───────── 라우팅 ───────── */
 function parseHash(){ const h = decodeURIComponent(location.hash.replace(/^#\/?/, "")); const [a, b, c] = h.split("/");
   if (a === "p" && b) return c === "edit" ? { v: "edit", id: b } : { v: "page", id: b, c: c === "c" ? h.split("/")[3] : null };
@@ -2306,7 +2355,7 @@ function showPage(id){
   document.title = (p.title || "제목 없음") + " · " + SPACE;
   const back = pages.filter(x => x.id !== id && (x.links || []).includes(id));
   main().innerHTML = `<div class="pagehd">${crumbsHTML(p)}<div class="pactions">${widthBtn()}
-      <button class="btn sm" id="pEdit" title="편집 (E)">✎ 편집</button>
+      <button class="btn sm subtle" id="pMap" title="이 페이지와 연결된 페이지들을 그림으로 보기">🕸 연결</button><button class="btn sm" id="pEdit" title="편집 (E)">✎ 편집</button>
       <button class="ibtn" id="pMore" title="더 보기">⋯</button></div></div>
     <div class="content cwv" style="${cwStyle()}">
       <h1 class="ptitle">${esc(p.title || "제목 없음")}</h1>
@@ -2325,7 +2374,7 @@ function showPage(id){
     li.classList.toggle("done"); markDue(li); const html = sanitize(unsortClone(d).innerHTML);
     try { await store.savePage(id, { html, text: plainOf(html).slice(0, 20000) }); } catch (ex) { li.classList.toggle("done"); markDue(li); toast(errMsg(ex)); }
   });
-  $("#pEdit").onclick = () => location.hash = "#/p/" + id + "/edit";
+  $("#pEdit").onclick = () => location.hash = "#/p/" + id + "/edit"; $("#pMap").onclick = () => openLinkMap(id);
   $("#pMore").onclick = e => showMenu([
     { label: "수정 기록", run: () => showHistory(id) },
     { label: "본문 너비 바꾸기 (보통 → 넓게 → 더 넓게 → 전체)", run: cycleWidth },
@@ -2730,10 +2779,10 @@ const readURL = f => new Promise((res, rej) => { const r = new FileReader(); r.o
 async function uploadFiles(files){
   for (const f of files) {
     if (f.size > (/^video/.test(f.type) ? 100 : 10) * 1024 * 1024) { toast(`${f.name}: 너무 커요 (이미지 10MB, 영상 100MB까지)`); continue; }
-    restoreSel(); const spot = inlineSpot(); let fig;
+    { const s0 = getSelection(); if (!(s0.rangeCount && ed && ed.contains(s0.anchorNode))) restoreSel(); } const spot = inlineSpot(); let fig;
     if (spot) { snapNow(); fig = document.createElement("span"); fig.className = "ifig w-m"; fig.contentEditable = "false"; fig.innerHTML = `<span class="uping">올리는 중… 0%</span>`;
       const r = getSelection().getRangeAt(0); r.collapse(true); r.insertNode(fig); caretAfter(fig); saveSel(); }
-    else { fig = document.createElement("figure"); fig.innerHTML = `<span class="uping" contenteditable="false">올리는 중… 0%</span>`; insertBlock(fig); }
+    else { fig = document.createElement("figure"); fig.innerHTML = `<span class="uping" contenteditable="false">올리는 중… 0%</span>`; saveSel(); insertBlock(fig); }
     try {
       let src, rt = /^video/.test(f.type) ? "video" : "image";
       if (CLD.length && mode === "cloud") ({ url: src } = await cloudUpload(f, p => { const u = fig.querySelector(".uping"); if (u) u.textContent = `올리는 중… ${p}%`; }));

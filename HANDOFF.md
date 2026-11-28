@@ -26,7 +26,7 @@
 |---|---|
 | 로컬로 보기 | `python3 -m http.server` 후 `http://localhost:8000/index.html?local` (`?local` = 클라우드 없이 이 브라우저에만 저장) |
 | 문법 확인 | `node -e "const s=require('fs').readFileSync('index.html','utf8');[...s.matchAll(/<script>([\s\S]*?)<\/script>/g)].forEach(x=>new Function(x[1]));console.log('ok')"` |
-| 스모크 테스트 | `python3 tests/smoke_test.py` (Playwright + Chromium 필요, 49개 항목, 로컬 모드. 마지막 줄 `OK`) |
+| 스모크 테스트 | `python3 tests/smoke_test.py` (Playwright + Chromium 필요, 50개 항목, 로컬 모드. 마지막 줄 `OK`) |
 | 배포 | `git push` → GitHub Pages가 자동 배포. 확인: `gh api "repos/ththys/design-wiki/actions/runs?per_page=1" --jq '.workflow_runs[0]\|.head_sha+" "+.status+" "+(.conclusion//"")'` |
 
 - 커밋 메시지: 한국어 한 줄로 무엇이 바뀌었는지.
@@ -79,6 +79,7 @@
 ### 본문 HTML
 - 저장·보기·붙여 넣기 모두 `sanitize()`를 거침. 허용 태그: `P H1~H6 B I U S SUB SUP MARK A UL OL LI BLOCKQUOTE PRE CODE HR BR TABLE THEAD TBODY TR TH TD FIGURE FIGCAPTION IMG VIDEO DIV` + `TIME.date`, `SPAN.status`. 글 속 `\u200b`(커서 빼기용)는 저장할 때 지움.
 - 특별한 모양: 패널 `div.panel.(info|note|warn|ok|err)`, 할 일 `ul.check > li(.done)`, 페이지 링크 `a.plink[data-page=id]`, 그림 크기 `figure.w-s|w-m`. 이미지·영상 주소는 `https://` 또는 `data:image/`만.
+- **연결 보기** (페이지 위 `🕸 연결` → `openLinkMap()`): 페이지 `links`(본문 링크·불러오기·차트 링크)와 그 반대(링크해 온 곳), 위·하위 페이지로 그래프를 만들어 `mountFlow()`로 그림. 1단계는 ‘링크해 온 곳 | 이 페이지 | 링크한 곳’ 3열, 2단계는 자동 배치, 최대 60개. 두 번 누르면 그 페이지로.
 - **옵션 패널** `div.opts[data-opts]` = `{title, rows:[{n 이름, t text|num|check|enum|head, v 값(check는 true/false), d 설명}]}` — 설정 창 예시를 그려 주는 블록(`/options`). `mountOpts()`가 그림, 설명 있는 줄은 마우스 올리면/누르면 아래 줄로 보임. 편집 `openOptsEditor()`(표, 엑셀 붙여 넣기: 이름·값·설명, 값 모양으로 칸 종류 추측).
 - **글 사이 이미지** `span.ifig.w-s|w-m|w-l > img` — 글이 있는 줄에서 이미지를 넣으면 그 자리에 글자처럼 들어감(`inlineSpot()`), 빈 줄이면 예전처럼 `figure`. 그림 막대 ‘한 줄 차지 ↔ 글 사이로’(`toggleInline`).
 - **나란히 놓기** `div.cols.c2.fit` — 칸 넓이가 내용 크기대로(`/side`). `insertBlock()`은 이제 `blockInBox()`로 나란히 칸·접기 속·패널 안에 그대로 넣음.
