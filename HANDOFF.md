@@ -69,7 +69,7 @@
 | `wiki_members/{email}` | `name, at, by` (승인된 팀원) |
 | `wiki_requests/{uid}` | `email, name, at, verified(지금은 안 씀), provider` |
 | `wiki_meta/signup` | `day("YYYY-MM-DD"), count` |
-| `wiki_meta/settings` | `signupClosed, glossary(용어 설명집 페이지 id), at, by` — 관리자만 씀, 누구나 읽음 |
+| `wiki_meta/settings` | `signupClosed, quickLinks[](오른쪽 위 바로가기 페이지 id), at, by` — 관리자만 씀, 누구나 읽음 |
 
 - 히스토리·댓글은 `where("pageId","==",id)`만 쓰고 정렬은 브라우저에서 함 → **복합 색인 필요 없음**. `orderBy`를 추가하면 색인을 만들어야 하니 주의.
 
@@ -79,8 +79,8 @@
 ### 본문 HTML
 - 저장·보기·붙여 넣기 모두 `sanitize()`를 거침. 허용 태그: `P H1~H6 B I U S SUB SUP MARK A UL OL LI BLOCKQUOTE PRE CODE HR BR TABLE THEAD TBODY TR TH TD FIGURE FIGCAPTION IMG VIDEO DIV` + `TIME.date`, `SPAN.status`. 글 속 `\u200b`(커서 빼기용)는 저장할 때 지움.
 - 특별한 모양: 패널 `div.panel.(info|note|warn|ok|err)`, 할 일 `ul.check > li(.done)`, 페이지 링크 `a.plink[data-page=id]`, 그림 크기 `figure.w-s|w-m`. 이미지·영상 주소는 `https://` 또는 `data:image/`만.
-- **용어 설명집**: 상단 `📖 용어` → 오른쪽 옆 패널(`#gloss`, 넓은 화면이면 본문을 밀어서 나란히, 왼쪽 경계 끌어 너비 조절 `wiki-glossw`). 찾기(Enter 다음), ↗ 새 창, ⇱ 이동. 어떤 페이지를 쓸지는 관리자가 페이지 ⋯ 메뉴 ‘용어 설명집으로 지정’ (로컬 모드는 `wiki-glossary`).
-- **목록·들여쓰기 키** (`listKeys()`, 페이지·댓글 공용): Tab=목록 항목 한 칸 들여쓰기(앞 항목 아래 하위 목록) / 보통 줄 `in-1~6` / 표 다음 칸(끝이면 줄 추가), Shift+Tab=반대(빈 항목은 그 항목만 지움), 첫 항목 맨 앞 Backspace=번호·글머리 없애기(`liftLi`), 빈 항목 Enter=내어쓰기·목록 끝내기.
+- **오른쪽 위 바로가기**: 관리자가 페이지 ⋯ 메뉴 ‘오른쪽 위 바로가기에 넣기’로 고른 페이지(최대 6개)가 🔔 왼쪽에 제목 링크로 보임. `wiki_meta/settings.quickLinks`(로컬 `wiki-qlinks`). 우클릭: 새 탭·순서·빼기. (용어 설명집 옆 패널은 사용자가 원치 않아 없앰)
+- **목록·들여쓰기 키** (`listKeys()`, 페이지·댓글 공용): Tab=목록 항목 한 칸 들여쓰기(앞 항목 아래 하위 목록) / 보통 줄 `in-1~6` / 표 다음 칸(끝이면 줄 추가), Shift+Tab=반대(맨 바깥이면 그 자리 보통 줄), 항목 맨 앞 Backspace=글머리만 없애고 그 자리에 보통 줄(`liftLi(li,true)`, `in-1`로 글자 위치 유지; 하위 항목은 한 칸 바깥으로), 빈 항목 Enter=내어쓰기·목록 끝내기.
 - **되돌리기**: 브라우저 기본 되돌리기를 안 씀. 편집기(페이지·댓글 상자)마다 `ed.__u` 기록, `snapNow()`=바꾸기 직전 상태 저장, `doUndo()`. 글자 입력은 `beforeinput`에서 0.8초 덩어리로 기록. **DOM을 직접 바꾸는 새 기능을 넣으면 그 앞에 `snapNow()`를 꼭 부를 것**(안 그러면 Ctrl+Z로 안 돌아감). 키: Ctrl+Z·Alt+Z 되돌리기, Ctrl+Y·Ctrl+Shift+Z 다시.
 - 도구 막대 메뉴(패널·더 넣기)는 `showMenu`로 여는데, 문서 클릭이 메뉴를 닫으므로 여는 단추는 닫기 예외 목록(`[data-act]`, `[data-r]` 등)에 있어야 함.
 - **할 일 기한**: `ul.check>li` 안의 `time.date`는 `markDue()`가 지난 날짜=`.late`(빨강), 오늘=`.today`(노랑), 끝낸 일=`.doneD`(회색 줄)로 칠함(저장 안 되는 보기용 클래스). 줄 **중간**에서 `[] ` 쳐도 그 줄 전체가 할 일이 됨(`blockAuto`).

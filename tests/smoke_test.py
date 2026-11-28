@@ -421,36 +421,35 @@ with sync_playwright() as p:
         res[tag + " Tab"] = a == f"<{tag}><li>Counter<{tag}><li>둘</li></{tag}></li><li>셋</li></{tag}>"
         pg.keyboard.press("Shift+Tab"); res[tag + " Shift+Tab"] = edh() == f"<{tag}><li>Counter</li><li>둘</li><li>셋</li></{tag}>"
         pg.keyboard.press("Shift+Tab"); res[tag + " Shift+Tab 맨바깥→글"] = edh() == f"<{tag}><li>Counter</li></{tag}><p>둘</p><{tag}><li>셋</li></{tag}>"
-        put(f"<{tag}><li>Counter</li><li><br></li></{tag}>", "li:first-child", 0); pg.keyboard.press("Backspace"); res[tag + " 첫 항목 Backspace"] = edh() == f"<p>Counter</p><{tag}><li></li></{tag}>" or edh() == f"<p>Counter</p><{tag}><li><br></li></{tag}>"
+        put(f"<{tag}><li>Counter</li><li><br></li></{tag}>", "li:first-child", 0); pg.keyboard.press("Backspace"); res[tag + " 첫 항목 Backspace"] = edh() in (f'<p class="in-1">Counter</p><{tag}><li></li></{tag}>', f'<p class="in-1">Counter</p><{tag}><li><br></li></{tag}>')
         put(f"<{tag}><li>a<{tag}><li><br></li></{tag}></li></{tag}>", "li li", 0); pg.keyboard.press("Enter"); res[tag + " 빈 하위 Enter"] = edh().startswith(f"<{tag}><li>a</li><li>")
     put("<ul><li><b>CounterClockWise</b></li><li><b>타입</b></li><li><br></li><li><b>boolean</b></li></ul>", "li:nth-child(3)", 0); pg.keyboard.press("Shift+Tab"); pg.keyboard.type("!")
-    res["가운데 빈 항목 Shift+Tab → 그 항목만 지움"] = edh() == "<ul><li><b>CounterClockWise</b></li><li><b>타입!</b></li><li><b>boolean</b></li></ul>"
-    put("<ul><li><b>CounterClockWise</b></li><li><b>타입</b></li><li><br></li><li><b>boolean</b></li></ul>", "li:nth-child(3)", 0); pg.keyboard.press("Backspace")
-    res["가운데 빈 항목 Backspace → 지움"] = edh() == "<ul><li><b>CounterClockWise</b></li><li><b>타입</b></li><li><b>boolean</b></li></ul>"
+    res["가운데 빈 항목 Shift+Tab → 그 자리 보통 줄"] = edh() == "<ul><li><b>CounterClockWise</b></li><li><b>타입</b></li></ul><p>!</p><ul><li><b>boolean</b></li></ul>"
+    put("<ul><li><b>CounterClockWise</b></li><li><b>타입</b></li><li><br></li><li><b>boolean</b></li></ul>", "li:nth-child(3)", 0); pg.keyboard.press("Backspace"); pg.keyboard.type("그냥 글"); b1 = edh()
+    pg.keyboard.press("Home"); pg.keyboard.press("Backspace"); b2 = edh(); pg.keyboard.press("Backspace"); b3 = edh()
+    res["가운데 빈 항목 Backspace → 글머리만 없어지고 그 자리에서 글쓰기"] = b1 == '<ul><li><b>CounterClockWise</b></li><li><b>타입</b></li></ul><p class="in-1">그냥 글</p><ul><li><b>boolean</b></li></ul>' and '<p>그냥 글</p>' in b2 and "타입그냥 글" in b3.replace("</b>", "")
+    put("<ul><li>타입<ul><li>boolean</li></ul></li><li>기본값</li></ul>", "li li", 0); pg.keyboard.press("Backspace")
+    res["하위 항목 맨 앞 Backspace → 한 칸 바깥"] = edh() == "<ul><li>타입</li><li>boolean</li><li>기본값</li></ul>"
     put("<p>들여쓰기</p>", "p", 0); pg.keyboard.press("Tab"); pg.keyboard.press("Tab"); r1 = edh(); pg.keyboard.press("Shift+Tab"); r2 = edh(); pg.keyboard.press("Control+z"); r3 = edh()
     res["보통 줄 Tab/Shift+Tab/되돌리기"] = r1 == '<p class="in-2">들여쓰기</p>' and r2 == '<p class="in-1">들여쓰기</p>' and r3 == '<p class="in-2">들여쓰기</p>'
     put("<table><tbody><tr><th>a</th><th>b</th></tr><tr><td>c</td><td>d</td></tr></tbody></table>", "th", 0); pg.keyboard.press("Tab"); pg.keyboard.type("X")
     pg.keyboard.press("Tab"); pg.keyboard.press("Tab"); pg.keyboard.press("Tab"); pg.keyboard.type("Y"); t = edh()
     res["표 Tab 이동·끝에서 줄 추가"] = "<th>X</th>" in t and t.count("<tr>") == 3 and "<td>Y</td>" in t
+    gap = pg.evaluate("""() => { const e = document.querySelector('#ed'); e.innerHTML = '<ul><li>타입<ul><li>boolean</li></ul></li><li>기본값</li></ul>'; const a = e.querySelector('li li').getBoundingClientRect(), b = e.querySelectorAll(':scope>ul>li')[1].getBoundingClientRect(); return b.top - a.bottom; }""")
+    res["하위 목록 뒤 간격 없음"] = gap < 8
     check("목록 Tab 들여쓰기·Shift+Tab 내어쓰기·첫 항목 Backspace·빈 항목 Enter·보통 줄·표", all(res.values()), str({k: v for k, v in res.items() if not v}))
     pg.click("#edCancel"); pg.wait_for_timeout(100)
     if pg.locator("#askOk").count(): pg.click("#askOk"); pg.wait_for_timeout(200)
 
-    # 25) 용어 설명집 옆 패널
-    pg.evaluate("""() => { const d = JSON.parse(localStorage.getItem('wiki-v1')); d.pages.push({id:'gl1',title:'용어 설명집',html:'<h2>전투 용어</h2><table><tbody><tr><th>용어</th><th>뜻</th></tr><tr><td>그로기</td><td>일정 시간 행동 불능</td></tr><tr><td>패링</td><td>타이밍 맞춰 막기. 그로기 게이지 증가</td></tr></tbody></table>',parent:null,order:140,createdAt:1,updatedAt:1,createdBy:{name:'나'},updatedBy:{name:'나'},version:1}); localStorage.setItem('wiki-v1', JSON.stringify(d)); localStorage.removeItem('wiki-glossary'); }""")
-    pg.goto(URL + "#/p/gl1"); pg.reload(); pg.wait_for_timeout(300)
-    pg.click("#glossBtn"); pg.wait_for_timeout(100); empty = "아직 용어 설명집이 없어요" in pg.inner_text("#gloss")
-    pg.click("#pMore"); pg.locator(".menu button", has_text="용어 설명집으로 지정").click(); pg.wait_for_timeout(200)
-    shown = pg.locator("#gloss .gdoc td", has_text="행동 불능").count() == 1
-    pg.goto(URL + "#/p/cm1/edit"); pg.wait_for_timeout(300); still = pg.locator("#gloss .gdoc").is_visible() and pg.locator("#ed").count() == 1
-    side = pg.evaluate("document.querySelector('#gloss').getBoundingClientRect().left > document.querySelector('#ed').getBoundingClientRect().right - 2")
-    pg.fill("#gQ", "그로기"); pg.wait_for_timeout(100); cnt = pg.inner_text("#gCnt"); pg.press("#gQ", "Enter"); cnt2 = pg.inner_text("#gCnt")
-    with pg.expect_popup() as pop: pg.click("#gloss [data-gnew]")
-    newwin = pop.value.url.endswith("#/p/gl1"); pop.value.close()
-    pg.press("#gQ", "Escape"); closed = not pg.locator("#gloss").is_visible()
-    check("용어 설명집: 지정·옆 패널(편집 중에도 나란히)·찾기·새 창·Esc 닫기", empty and shown and still and side and cnt == "1/2" and cnt2 == "2/2" and newwin and closed, f"{empty},{shown},{still},{side},{cnt},{cnt2},{newwin},{closed}")
-    pg.click("#edCancel"); pg.wait_for_timeout(100)
-    if pg.locator("#askOk").count(): pg.click("#askOk"); pg.wait_for_timeout(200)
+    # 25) 오른쪽 위 바로가기 링크
+    pg.goto(URL + "#/p/cm1"); pg.wait_for_timeout(300)
+    pg.click("#pMore"); pg.locator(".menu button", has_text="바로가기에 넣기").click(); pg.wait_for_timeout(200)
+    pg.goto(URL + "#/"); pg.wait_for_timeout(200); has = pg.locator("#qlinks .qlink", has_text="댓글 시험").count() == 1
+    pg.click("#qlinks .qlink"); pg.wait_for_timeout(300); went = pg.evaluate("location.hash") == "#/p/cm1" and pg.locator("#qlinks .qlink.on").count() == 1
+    pg.reload(); pg.wait_for_timeout(300); kept = pg.locator("#qlinks .qlink").count() == 1
+    pg.click("#qlinks .qlink", button="right"); pg.locator(".menu button", has_text="바로가기에서 빼기").click(); pg.wait_for_timeout(200)
+    gone = pg.locator("#qlinks .qlink").count() == 0
+    check("오른쪽 위 바로가기: 페이지 메뉴로 넣기·눌러서 이동·새로고침해도 유지·우클릭으로 빼기", has and went and kept and gone, f"{has},{went},{kept},{gone}")
     check("자바스크립트 오류 없음", not errs, "; ".join(errs[:3]))
     b.close()
 srv.shutdown()
