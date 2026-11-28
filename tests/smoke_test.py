@@ -641,6 +641,18 @@ with sync_playwright() as p:
     if opened: pg.click('[data-oe="ok"]'); pg.wait_for_timeout(150)
     pg.click("#edCancel"); pg.wait_for_timeout(100)
     if pg.locator("#askOk").count(): pg.click("#askOk"); pg.wait_for_timeout(200)
+
+    # 39) 페이지 링크 고르기: 친 글자(상자 안으로 들어가도)로 검색
+    pg.goto(URL + "#/"); pg.wait_for_timeout(150); pg.click("#createBtn"); pg.wait_for_timeout(250); pg.fill("#edTitle", "링크 검색"); pg.click("#ed")
+    pg.evaluate("(() => { const e = document.querySelector('#ed'); e.innerHTML = '<ol><li>a</li><li><br></li></ol>'; caretIn(e.querySelectorAll('li')[1]); })()")
+    pg.keyboard.type("/link"); pg.wait_for_timeout(100); pg.keyboard.press("Enter"); pg.wait_for_timeout(150)
+    type_ko(pg, "전투 기획"); pg.wait_for_timeout(150)
+    hd = pg.inner_text("#pick") if pg.locator("#pick").count() else ""
+    pg.keyboard.press("Enter"); pg.wait_for_timeout(100)
+    html = pg.evaluate("sanitize(document.querySelector('#ed').innerHTML)")
+    check("페이지 링크: 친 글자로 검색·골라 넣기", "‘전투 기획’" in hd and 'class="plink">전투 기획 개요</a>' in html and "전투 기획</li>" not in html, f"{hd[:80]},{html}")
+    pg.click("#edCancel"); pg.wait_for_timeout(100)
+    if pg.locator("#askOk").count(): pg.click("#askOk"); pg.wait_for_timeout(200)
     check("자바스크립트 오류 없음", not errs, "; ".join(errs[:3]))
     b.close()
 srv.shutdown()

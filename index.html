@@ -2967,7 +2967,7 @@ const SLASH = [["제목 1", "h1", "heading"], ["제목 2", "h2", "heading"], ["�
   ["코드 블록", "pre", "code"], ["인용", "quote", "quote"], ["구분선", "hr", "divider rule"], ["글머리 목록", "ul", "bullet list"], ["번호 목록", "ol", "numbered list"], ["페이지 링크", "plink", "link page"]];
 function pickQuery(){
   const st = pickState; if (!st) return "";
-  if (st.kind === "page") { const a = st.anchor; if (!a.isConnected) return null; const s = getSelection(); if (!s.rangeCount) return ""; const r = document.createRange(); r.setStartAfter(a); try { r.setEnd(s.anchorNode, s.anchorOffset); } catch { return null; } return r.toString(); }
+  if (st.kind === "page") { const a = st.anchor; if (!a.isConnected) return null; const s = getSelection(); if (!s.rangeCount) return ""; const r = document.createRange(); r.setStartBefore(a); try { r.setEnd(s.anchorNode, s.anchorOffset); } catch { return null; } if (r.collapsed && !a.contains(s.anchorNode) && s.anchorNode !== a.parentNode) return null; return r.toString().replace(/\u200b/g, ""); }
   const s = getSelection(); if (!s.rangeCount || s.anchorNode !== st.node) return null; if (s.anchorOffset < st.off) return null; return st.node.data.slice(st.off, s.anchorOffset);
 }
 /* 한글 검색: 자모로 풀어서 비교 (입력 중인 'ㅇ', '이여' 도 '이영호'에 맞음) + 초성 검색 ('ㅇㅇㅎ') */
