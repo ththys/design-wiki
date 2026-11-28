@@ -469,6 +469,22 @@ body.rzing{cursor:col-resize;user-select:none} body.rzing *{cursor:col-resize!im
 .menu.notes .nt .avatar{width:28px;height:28px;font-size:12px;flex:none}
 .menu.notes .nt.new{background:var(--sel)} .menu.notes .nb{display:flex;flex-direction:column;gap:2px;font-size:13px;line-height:1.45;min-width:0}
 .menu.notes .nb small{color:var(--muted);font-size:11px} .menu.notes .nx{color:var(--sub)!important;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ── 용어 설명집 옆 패널 ── */
+.gdrawer{position:fixed;top:56px;right:0;bottom:0;width:var(--gw,420px);background:var(--panel);border-left:1px solid var(--line);z-index:30;display:none;flex-direction:column;box-shadow:-6px 0 18px rgba(9,30,66,.08)}
+body.glossopen .gdrawer{display:flex}
+.g-rz{display:none;position:fixed;top:56px;bottom:0;right:calc(var(--gw,420px) - 4px);width:8px;cursor:col-resize;z-index:31}
+body.glossopen .g-rz{display:block} .g-rz:hover{background:linear-gradient(90deg,transparent 3px,var(--brand) 3px,var(--brand) 5px,transparent 5px)}
+@media (min-width:1100px){body.glossopen .main{margin-right:var(--gw,420px)}}
+.ghd{display:flex;align-items:center;gap:4px;padding:10px 10px 8px 16px;border-bottom:1px solid var(--line2)}
+.ghd b{font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0} .ghd .grow{flex:1}
+.gsearch{display:flex;align-items:center;gap:8px;padding:8px 16px;border-bottom:1px solid var(--line2)} .gsearch input{flex:1;font-size:13px} #gCnt{font-size:12px;color:var(--muted);white-space:nowrap}
+.gset{padding:8px 16px;border-bottom:1px solid var(--line2)} .gset select,.gbody select{width:100%}
+.gbody{flex:1;overflow:auto;padding:14px 18px 40px}
+.gdoc{font-size:14px} .gdoc h1{font-size:20px} .gdoc h2{font-size:17px} .gdoc table{font-size:13px}
+mark.gq{background:rgba(255,214,0,.45);color:inherit;border-radius:2px} mark.gq.on{background:#ff9f1a;color:#000}
+.gbtn{white-space:nowrap} body.glossopen .gbtn{background:var(--sel);color:var(--brand)}
+@media (max-width:700px){.gbtn{padding:0 6px;font-size:0} .gbtn::before{content:"📖";font-size:15px}}
 /* 모달·토스트 */
 .scrim{position:fixed;inset:0;background:rgba(9,30,66,.54);z-index:50;display:grid;place-items:center;padding:20px}
 .modal{background:var(--panel);border-radius:6px;box-shadow:var(--shadow);width:min(560px,100%);max-height:calc(100vh - 40px);display:flex;flex-direction:column}
@@ -544,6 +560,7 @@ body.rzing{cursor:col-resize;user-select:none} body.rzing *{cursor:col-resize!im
       <div class="sres" id="sres" hidden></div>
     </div>
     <div class="tright">
+      <button class="btn sm subtle gbtn" id="glossBtn" type="button" title="용어 설명집 (옆에 펼치기)">📖 용어</button>
       <button class="ibtn nbell" id="noteBtn" type="button" title="알림" aria-label="알림">🔔<span id="noteN"></span></button>
       <button class="ibtn" id="keysBtn" type="button" title="단축키 (?)" aria-label="단축키">⌨</button>
       <button class="ibtn" id="themeBtn" type="button" aria-label="화면 밝기"></button>
@@ -580,7 +597,7 @@ let mode = "local", fs = null, auth = null, user = null;
 let allPages = [];              // 휴지통 포함 전부
 let pages = [];                 // 휴지통에 없는 페이지만 (화면은 전부 이걸 씀)
 const TRASH_DAYS = 7;
-function setPages(list){ allPages = list; pages = list.filter(p => !p.trashedAt); paintTrash(); purgeOld(); }
+function setPages(list){ allPages = list; pages = list.filter(p => !p.trashedAt); paintTrash(); purgeOld(); if (typeof paintGloss === "function") paintGloss(false); }
 // {id,title,html,text,parent,order,links,createdAt,createdBy,updatedAt,updatedBy,version}
 let unsub = null, ready = false;
 let open = new Set(JSON.parse(localStorage.getItem("wiki-open") || "[]"));
@@ -1909,6 +1926,68 @@ function listKeys(e){
   return false;
 }
 
+/* ───────── 용어 설명집 (오른쪽 옆 패널) ───────── */
+let glossaryId = localStorage.getItem("wiki-glossary") || "", glossHTML = "";
+const canSetGloss = () => mode !== "cloud" || isAdmin;
+async function setGlossary(id){
+  if (mode === "cloud") { try { await fs.collection("wiki_meta").doc("settings").set({ glossary: id || "", at: Date.now(), by: me().email }, { merge: true }); } catch (ex) { toast(errMsg(ex)); return; } }
+  else localStorage.setItem("wiki-glossary", id || "");
+  glossaryId = id || ""; toast(id ? `‘${(byId(id) || {}).title || "제목 없음"}’을(를) 용어 설명집으로 정했어요` : "용어 설명집 지정을 풀었어요"); paintGloss(true);
+}
+function watchGlossary(){ if (mode !== "cloud") return; fs.collection("wiki_meta").doc("settings").onSnapshot(d => { const g = (d.exists && d.data().glossary) || ""; if (g !== glossaryId) { glossaryId = g; paintGloss(true); } }, () => {}); }
+function glossOpen(){ return document.body.classList.contains("glossopen"); }
+function toggleGloss(force){
+  const on = force === undefined ? !glossOpen() : force; document.body.classList.toggle("glossopen", on); localStorage.setItem("wiki-gloss-open", on ? "1" : "0");
+  if (on) { paintGloss(true); setTimeout(() => { const i = $("#gQ"); if (i) i.focus(); }, 0); }
+}
+function paintGloss(force){
+  const box = $("#gloss"); if (!box || !glossOpen()) return; const p = glossaryId && byId(glossaryId);
+  if (!force && p && glossHTML === p.html && box.querySelector(".gdoc")) return;
+  const pick = canSetGloss() ? `<select id="gPick"><option value="">용어 설명집으로 쓸 페이지 고르기…</option>${[...pages].sort((a, b) => KO_SORT.compare(a.title || "", b.title || "")).map(x => `<option value="${esc(x.id)}"${x.id === glossaryId ? " selected" : ""}>${esc(x.title || "제목 없음")}</option>`).join("")}</select>` : "";
+  if (!p) { glossHTML = "";
+    box.innerHTML = `<div class="ghd"><b>📖 용어 설명집</b><span class="grow"></span><button class="ibtn" data-gx title="닫기 (Esc)">✕</button></div>
+      <div class="gbody"><div class="empty" style="padding:24px 8px"><b>아직 용어 설명집이 없어요</b>${canSetGloss() ? "용어를 정리한 페이지를 골라 주세요. 페이지 ⋯ 메뉴의 ‘용어 설명집으로 지정’으로도 정할 수 있어요." : "관리자가 용어 설명집 페이지를 정하면 여기 보여요."}</div>${pick}</div>`;
+  } else { glossHTML = p.html;
+    box.innerHTML = `<div class="ghd"><b title="${esc(p.title || "")}">📖 ${esc(p.title || "용어 설명집")}</b><span class="grow"></span>
+        <button class="ibtn" data-gnew title="새 창으로 열기">↗</button><button class="ibtn" data-ggo title="이 페이지로 이동">⇱</button>${canSetGloss() ? `<button class="ibtn" data-gset title="다른 페이지로 바꾸기">⚙</button>` : ""}<button class="ibtn" data-gx title="닫기 (Esc)">✕</button></div>
+      <div class="gsearch"><input id="gQ" type="search" placeholder="용어 찾기 (Enter 다음 · Shift+Enter 이전)" autocomplete="off"><span id="gCnt"></span></div>
+      <div class="gset" hidden>${pick}</div>
+      <div class="gbody"><div class="doc gdoc">${sanitize(p.html) || `<p style="color:var(--muted)">내용이 비어 있어요</p>`}</div></div>`;
+    const d = box.querySelector(".gdoc"); fixLinks(d); renderExtras(d, p.id); wireExtras(d); markMe(d);
+  }
+  const sel = box.querySelector("#gPick"); if (sel) sel.onchange = () => setGlossary(sel.value);
+}
+function glossFind(dir){ /* 찾기: 맞는 곳에 표시하고 차례로 이동 */
+  const box = $("#gloss"), d = box && box.querySelector(".gdoc"), q = ($("#gQ") || {}).value || ""; if (!d) return;
+  if (box._q !== q) { box._q = q; box._i = -1;
+    d.querySelectorAll("mark.gq").forEach(m => { m.replaceWith(...m.childNodes); }); d.normalize();
+    if (q.trim()) { const ql = q.trim().toLowerCase(), walker = document.createTreeWalker(d, NodeFilter.SHOW_TEXT), hits = [];
+      while (walker.nextNode()) { const n = walker.currentNode; if (n.parentElement.closest(".fc,.gt")) continue; let i = n.data.toLowerCase().indexOf(ql); while (i >= 0) { hits.push([n, i]); i = n.data.toLowerCase().indexOf(ql, i + ql.length); } }
+      for (let k = hits.length - 1; k >= 0; k--) { const [n, i] = hits[k]; const r = document.createRange(); r.setStart(n, i); r.setEnd(n, i + ql.length); const m = document.createElement("mark"); m.className = "gq"; r.surroundContents(m); } } }
+  const ms = [...d.querySelectorAll("mark.gq")]; const c = $("#gCnt"); if (!ms.length) { if (c) c.textContent = q.trim() ? "없음" : ""; return; }
+  box._i = box._i < 0 ? 0 : (box._i + (dir || 0) + ms.length) % ms.length;
+  ms.forEach((m, i) => m.classList.toggle("on", i === box._i)); ms[box._i].scrollIntoView({ block: "center" }); if (c) c.textContent = `${box._i + 1}/${ms.length}`;
+}
+function wireGloss(){
+  const box = document.createElement("aside"); box.id = "gloss"; box.className = "gdrawer"; document.body.appendChild(box);
+  const rz = document.createElement("div"); rz.className = "g-rz"; rz.title = "끌어서 너비 바꾸기"; box.before(rz);
+  const r = document.documentElement, w = parseInt(localStorage.getItem("wiki-glossw")); if (w >= 300 && w <= 900) r.style.setProperty("--gw", w + "px");
+  rz.addEventListener("pointerdown", e => { e.preventDefault(); document.body.classList.add("rzing"); const mv = ev => r.style.setProperty("--gw", Math.max(300, Math.min(900, innerWidth - ev.clientX)) + "px");
+    const up = ev => { removeEventListener("pointermove", mv); removeEventListener("pointerup", up); document.body.classList.remove("rzing"); localStorage.setItem("wiki-glossw", Math.max(300, Math.min(900, innerWidth - ev.clientX))); };
+    addEventListener("pointermove", mv); addEventListener("pointerup", up); });
+  box.addEventListener("click", e => {
+    if (e.target.closest("[data-gx]")) return toggleGloss(false);
+    if (e.target.closest("[data-gnew]")) return void window.open(location.pathname + location.search + "#/p/" + glossaryId, "_blank");
+    if (e.target.closest("[data-ggo]")) { location.hash = "#/p/" + glossaryId; return; }
+    if (e.target.closest("[data-gset]")) { const s = box.querySelector(".gset"); if (s) s.hidden = !s.hidden; }
+  });
+  box.addEventListener("input", e => { if (e.target.id === "gQ") { box._q = null; glossFind(0); } });
+  box.addEventListener("keydown", e => { if (e.target.id === "gQ" && e.key === "Enter" && !e.isComposing) { e.preventDefault(); glossFind(e.shiftKey ? -1 : 1); }
+    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); toggleGloss(false); } });
+  $("#glossBtn").onclick = () => toggleGloss();
+  if (localStorage.getItem("wiki-gloss-open") === "1") document.body.classList.add("glossopen");
+}
+
 /* ───────── 라우팅 ───────── */
 function parseHash(){ const h = decodeURIComponent(location.hash.replace(/^#\/?/, "")); const [a, b, c] = h.split("/");
   if (a === "p" && b) return c === "edit" ? { v: "edit", id: b } : { v: "page", id: b, c: c === "c" ? h.split("/")[3] : null };
@@ -2199,6 +2278,7 @@ function showPage(id){
     { label: "하위 페이지 만들기", run: () => { open.add(id); saveOpen(); goTo("#/new/" + id); } },
     { label: "복제", run: () => duplicatePage(id) },
     { label: "링크 복사", run: () => copyLink(id) },
+    ...(canSetGloss() ? [glossaryId === id ? { label: "📖 용어 설명집 지정 풀기", run: () => setGlossary("") } : { label: "📖 용어 설명집으로 지정", run: () => setGlossary(id) }] : []),
     "-", { label: "삭제", danger: true, run: () => deletePage(id) }], e.currentTarget);
   wireComments(id); loadComments(id);
 }
@@ -2627,7 +2707,7 @@ function wireChrome(){
   $("#navBtn").onclick = () => document.body.classList.toggle("navopen");
   $("#meBtn").onclick = e => showMenu([{ head: user ? (user.displayName ? user.displayName + " · " : "") + (user.email || "") : "이 브라우저에만 저장 중" },
     ...(user ? [{ label: "로그아웃", run: () => auth.signOut() }] : [])], e.currentTarget);
-  wireTree(); wireSearch(); wireKeys(); wireSideResize();
+  wireTree(); wireSearch(); wireKeys(); wireSideResize(); wireGloss();
   $("#keysBtn").onclick = showKeys; $("#noteBtn").onclick = e => noteMenu(e.currentTarget);
 }
 function setMode(){
@@ -2729,7 +2809,7 @@ async function bootCloud(){
     if (signingUp) return;
     showApp(); main().innerHTML = `<div class="content"><div class="empty">불러오는 중…</div></div>`;
     unsub = fs.collection("wiki_pages").onSnapshot(s => { setPages(s.docs.map(d => ({ id: d.id, ...d.data() }))); const first = !ready; ready = true; renderTree();
-        if (first) { startNotes(); const m = me(); if (m.email) { const pd = fs.collection("wiki_meta").doc("people");
+        if (first) { startNotes(); watchGlossary(); paintGloss(true); const m = me(); if (m.email) { const pd = fs.collection("wiki_meta").doc("people");
           pd.get().then(x => { peopleDoc = (x.exists && x.data()) || {}; const k = m.email.toLowerCase(); if (!peopleDoc[k] || peopleDoc[k].name !== m.name) pd.set({ [k]: { name: m.name, at: Date.now() } }, { merge: true }).catch(() => {}); }).catch(() => {}); } }
         if (first || !editing) route(true); else renderTree(); },
       ex => { if (/permission/i.test(ex.code || ex.message)) { if (!signingUp) showPending(u, false); } else toast("불러오지 못했어요. 새로고침해 보세요"); });

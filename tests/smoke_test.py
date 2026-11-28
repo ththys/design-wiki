@@ -435,6 +435,22 @@ with sync_playwright() as p:
     check("목록 Tab 들여쓰기·Shift+Tab 내어쓰기·첫 항목 Backspace·빈 항목 Enter·보통 줄·표", all(res.values()), str({k: v for k, v in res.items() if not v}))
     pg.click("#edCancel"); pg.wait_for_timeout(100)
     if pg.locator("#askOk").count(): pg.click("#askOk"); pg.wait_for_timeout(200)
+
+    # 25) 용어 설명집 옆 패널
+    pg.evaluate("""() => { const d = JSON.parse(localStorage.getItem('wiki-v1')); d.pages.push({id:'gl1',title:'용어 설명집',html:'<h2>전투 용어</h2><table><tbody><tr><th>용어</th><th>뜻</th></tr><tr><td>그로기</td><td>일정 시간 행동 불능</td></tr><tr><td>패링</td><td>타이밍 맞춰 막기. 그로기 게이지 증가</td></tr></tbody></table>',parent:null,order:140,createdAt:1,updatedAt:1,createdBy:{name:'나'},updatedBy:{name:'나'},version:1}); localStorage.setItem('wiki-v1', JSON.stringify(d)); localStorage.removeItem('wiki-glossary'); }""")
+    pg.goto(URL + "#/p/gl1"); pg.reload(); pg.wait_for_timeout(300)
+    pg.click("#glossBtn"); pg.wait_for_timeout(100); empty = "아직 용어 설명집이 없어요" in pg.inner_text("#gloss")
+    pg.click("#pMore"); pg.locator(".menu button", has_text="용어 설명집으로 지정").click(); pg.wait_for_timeout(200)
+    shown = pg.locator("#gloss .gdoc td", has_text="행동 불능").count() == 1
+    pg.goto(URL + "#/p/cm1/edit"); pg.wait_for_timeout(300); still = pg.locator("#gloss .gdoc").is_visible() and pg.locator("#ed").count() == 1
+    side = pg.evaluate("document.querySelector('#gloss').getBoundingClientRect().left > document.querySelector('#ed').getBoundingClientRect().right - 2")
+    pg.fill("#gQ", "그로기"); pg.wait_for_timeout(100); cnt = pg.inner_text("#gCnt"); pg.press("#gQ", "Enter"); cnt2 = pg.inner_text("#gCnt")
+    with pg.expect_popup() as pop: pg.click("#gloss [data-gnew]")
+    newwin = pop.value.url.endswith("#/p/gl1"); pop.value.close()
+    pg.press("#gQ", "Escape"); closed = not pg.locator("#gloss").is_visible()
+    check("용어 설명집: 지정·옆 패널(편집 중에도 나란히)·찾기·새 창·Esc 닫기", empty and shown and still and side and cnt == "1/2" and cnt2 == "2/2" and newwin and closed, f"{empty},{shown},{still},{side},{cnt},{cnt2},{newwin},{closed}")
+    pg.click("#edCancel"); pg.wait_for_timeout(100)
+    if pg.locator("#askOk").count(): pg.click("#askOk"); pg.wait_for_timeout(200)
     check("자바스크립트 오류 없음", not errs, "; ".join(errs[:3]))
     b.close()
 srv.shutdown()
