@@ -569,6 +569,18 @@ with sync_playwright() as p:
     check("표 바로 위 빈 틈에서도 블록이 그 자리에", html.startswith('<p>위</p><ul class="decision">') and html.index("decision") < html.index("<table"), html)
     pg.click("#edCancel"); pg.wait_for_timeout(100)
     if pg.locator("#askOk").count(): pg.click("#askOk"); pg.wait_for_timeout(200)
+
+    # 34) 표 칸 경계 끌어서 너비 바꾸기
+    pg.goto(URL + "#/"); pg.wait_for_timeout(150); pg.click("#createBtn"); pg.wait_for_timeout(250); pg.fill("#edTitle", "칸 너비"); pg.click("#ed")
+    pg.evaluate("(() => { const e = document.querySelector('#ed'); e.innerHTML = '<table><tbody><tr><td>a</td><td>b</td></tr><tr><td>c</td><td>d</td></tr></tbody></table><p>끝</p>'; })()")
+    c0 = pg.locator("#ed td").first.bounding_box(); x = c0["x"] + c0["width"]; y = c0["y"] + c0["height"] / 2
+    pg.mouse.move(x - 1, y); pg.mouse.down(); pg.mouse.move(x - 150, y, steps=5); pg.mouse.up(); pg.wait_for_timeout(80)
+    c1 = pg.locator("#ed td").first.bounding_box()
+    html = pg.evaluate("sanitize(document.querySelector('#ed').innerHTML)")
+    pg.keyboard.press("Control+z"); pg.wait_for_timeout(80); c2 = pg.locator("#ed td").first.bounding_box()
+    check("표 칸 경계 끌어서 너비 바꾸기·저장·되돌리기", c1["width"] < c0["width"] - 100 and 'width="' in html and abs(c2["width"] - c0["width"]) < 3, f"{c0['width']},{c1['width']},{c2['width']},{html}")
+    pg.click("#edCancel"); pg.wait_for_timeout(100)
+    if pg.locator("#askOk").count(): pg.click("#askOk"); pg.wait_for_timeout(200)
     check("자바스크립트 오류 없음", not errs, "; ".join(errs[:3]))
     b.close()
 srv.shutdown()

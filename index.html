@@ -160,6 +160,8 @@ body.rzing{cursor:col-resize;user-select:none} body.rzing *{cursor:col-resize!im
 .doc pre code{background:none;border:0;padding:0}
 .doc table{border-collapse:collapse;margin:0 0 16px;width:100%;table-layout:fixed}
 .doc th,.doc td{border:1px solid var(--line);padding:7px 10px;vertical-align:top;text-align:left;min-width:60px}
+.editor .doc.col-rs,.editor.col-rs,#ed.col-rs,#ed.col-rs td,#ed.col-rs th,body.col-rs-drag,body.col-rs-drag *{cursor:col-resize!important}
+body.col-rs-drag{user-select:none}
 .doc th{background:var(--hover);font-weight:600}
 .doc table[data-sortable] tr:first-child th{cursor:pointer;user-select:none;position:relative;padding-right:22px}
 .doc table[data-sortable] tr:first-child th:hover{background:var(--sel)}
@@ -795,7 +797,8 @@ function sanitize(html){
       if (t === "UL" && n.classList && n.classList.contains("check")) e.className = "check";
       if (t === "UL" && n.classList && n.classList.contains("decision")) e.className = "decision";
       if (/^(P|H[1-6]|LI)$/.test(t) && n.classList) { const cs = [...n.classList].filter(c => /^(al-[cr]|in-[1-6]|lh-[134])$/.test(c) || (t === "LI" && c === "done")); if (cs.length) e.className = cs.join(" "); }
-      if ((t === "TD" || t === "TH")) { ["colspan", "rowspan"].forEach(a => { const v = parseInt(n.getAttribute(a)); if (v > 1 && v < 50) e.setAttribute(a, v); }); }
+      if ((t === "TD" || t === "TH")) { ["colspan", "rowspan"].forEach(a => { const v = parseInt(n.getAttribute(a)); if (v > 1 && v < 50) e.setAttribute(a, v); });
+        const w = n.getAttribute("width") || ""; if (/^\d{1,2}(\.\d)?%$/.test(w)) e.setAttribute("width", w); }
       walk(n, e);
       if (t === "FIGURE" && !e.querySelector("img,video")) return;
       out.appendChild(e);
@@ -2191,6 +2194,30 @@ function panelKeys(e){
   const c = document.createRange(); c.setStart(first && first.nodeType === 1 ? first : first.parentNode, 0); c.collapse(true); s.removeAllRanges(); s.addRange(c); return true;
 }
 
+/* 표 칸 경계를 끌어서 칸 너비 바꾸기 — 첫 줄 칸에 width="%"로 저장 */
+function colEdgeAt(e){
+  const cell = e.target.closest && e.target.closest("td,th"); if (!cell || !ed.contains(cell) || cell.closest(".opts,.flow,.gantt,.ifig")) return null;
+  const tb = cell.closest("table"), r = cell.getBoundingClientRect(); let x = null;
+  if (Math.abs(e.clientX - r.right) <= 5) x = r.right; else if (Math.abs(e.clientX - r.left) <= 5) x = r.left; if (x === null) return null;
+  const first = tb.rows[0]; if (!first) return null; const cells = [...first.cells];
+  const i = cells.findIndex(c => Math.abs(c.getBoundingClientRect().right - x) <= 4); if (i < 0 || i === cells.length - 1) return null;
+  return { tb, cells, i };
+}
+function wireColResize(){
+  ed.addEventListener("pointermove", e => { if (ed.__colDrag) return; ed.classList.toggle("col-rs", !!colEdgeAt(e)); });
+  ed.addEventListener("pointerdown", e => {
+    const hit = colEdgeAt(e); if (!hit || e.button) return; e.preventDefault(); e.stopPropagation(); snapNow();
+    const { tb, cells, i } = hit, tw = tb.getBoundingClientRect().width, ws = cells.map(c => c.getBoundingClientRect().width), x0 = e.clientX;
+    const a0 = ws[i], b0 = ws[i + 1], min = 40; ed.__colDrag = true; document.body.classList.add("col-rs-drag");
+    cells.forEach((c, k) => c.setAttribute("width", (ws[k] / tw * 100).toFixed(1) + "%"));
+    const mv = ev => { let d = ev.clientX - x0; d = Math.max(min - a0, Math.min(b0 - min, d));
+      cells[i].setAttribute("width", ((a0 + d) / tw * 100).toFixed(1) + "%"); cells[i + 1].setAttribute("width", ((b0 - d) / tw * 100).toFixed(1) + "%"); };
+    const up = () => { removeEventListener("pointermove", mv); removeEventListener("pointerup", up); ed.__colDrag = false; document.body.classList.remove("col-rs-drag"); };
+    addEventListener("pointermove", mv); addEventListener("pointerup", up);
+  }, true);
+  ed.addEventListener("dblclick", e => { const hit = colEdgeAt(e); if (!hit) return; e.preventDefault(); snapNow(); hit.cells.forEach(c => c.removeAttribute("width")); });
+}
+
 /* ───────── 라우팅 ───────── */
 function parseHash(){ const h = decodeURIComponent(location.hash.replace(/^#\/?/, "")); const [a, b, c] = h.split("/");
   if (a === "p" && b) return c === "edit" ? { v: "edit", id: b } : { v: "page", id: b, c: c === "c" ? h.split("/")[3] : null };
@@ -2695,6 +2722,7 @@ function wireEditor(id, isNew){
   });
   ed.addEventListener("input", e => richInput(e, true));
 ;
+  wireColResize();
   ed.addEventListener("pointerdown", e => { const h = e.target.closest("[data-bdrag]"); if (h && ed.contains(h)) startBlockDrag(e, h.closest("div.opts,div.flow,div.gantt")); }, true);
   ed.addEventListener("click", e => {
     if (e.target.closest("[data-bdrag]")) { e.preventDefault(); return; }
