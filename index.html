@@ -1732,6 +1732,10 @@ function richInput(e, allowSlash){ /* 글자로 치는 서식 (한글 입력기�
     else if (!inCode && before.endsWith(":") && sp(before[o - 2])) openSlash(n, o, "emoji");
     else if (!inCode && before.endsWith("@") && sp(before[o - 2])) openSlash(n, o, "mention");
   } else if (e.inputType === "insertText" && n && n.nodeType === 1 && e.data === " ") blockAuto();
+  else if (!pickState && /^delete/.test(e.inputType || "") && n && n.nodeType === 3 && !n.parentElement.closest("pre,code,a")) { /* 지우다가도 /·@ 메뉴 다시 열기 */
+    const o = s.anchorOffset, m = /(^|[\s\u00a0\u200b])([\/@])([^\s\u00a0\/@]{0,30})$/.exec(n.data.slice(0, o));
+    if (m && (m[2] === "@" || allowSlash)) { openSlash(n, o - m[3].length, m[2] === "/" ? "slash" : "mention"); if (!$("#pick")) return; }
+  }
   if (pickState) updatePicker();
 }
 /* ───────── 사람 목록 (@멘션) ───────── */

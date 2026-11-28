@@ -591,6 +591,15 @@ with sync_playwright() as p:
     check("목록 줄에서 [] → 그 자리에 체크 상자 (번호 목록 그대로)·누르면 체크", html == '<ol><li>하나</li><li><a data-page="x1" href="#/p/x1" class="plink">배회</a>&nbsp;<span class="ick on"></span>&nbsp;확인</li><li>셋</li></ol><p>끝</p>', html)
     pg.click("#edCancel"); pg.wait_for_timeout(100)
     if pg.locator("#askOk").count(): pg.click("#askOk"); pg.wait_for_timeout(200)
+
+    # 36) / 메뉴: 틀리게 쳐서 닫혀도 지우면 다시 열림
+    pg.goto(URL + "#/"); pg.wait_for_timeout(150); pg.click("#createBtn"); pg.wait_for_timeout(250); pg.fill("#edTitle", "슬래시"); pg.click("#ed")
+    pg.keyboard.type("/linkq"); pg.wait_for_timeout(80); closed = pg.locator("#pick").count() == 0
+    pg.keyboard.press("Backspace"); pg.wait_for_timeout(80); reopened = pg.locator("#pick").count() == 1 and pg.locator("#pick", has_text="페이지 링크").count() == 1
+    pg.keyboard.press("Backspace"); pg.keyboard.press("Backspace"); pg.wait_for_timeout(80); still = pg.locator("#pick").count() == 1
+    check("/ 메뉴: 틀려서 닫혀도 지우면 다시 열림", closed and reopened and still, f"{closed},{reopened},{still}")
+    pg.keyboard.press("Escape"); pg.click("#edCancel"); pg.wait_for_timeout(100)
+    if pg.locator("#askOk").count(): pg.click("#askOk"); pg.wait_for_timeout(200)
     check("자바스크립트 오류 없음", not errs, "; ".join(errs[:3]))
     b.close()
 srv.shutdown()
