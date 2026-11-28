@@ -423,6 +423,10 @@ with sync_playwright() as p:
         pg.keyboard.press("Shift+Tab"); res[tag + " Shift+Tab 맨바깥→글"] = edh() == f"<{tag}><li>Counter</li></{tag}><p>둘</p><{tag}><li>셋</li></{tag}>"
         put(f"<{tag}><li>Counter</li><li><br></li></{tag}>", "li:first-child", 0); pg.keyboard.press("Backspace"); res[tag + " 첫 항목 Backspace"] = edh() == f"<p>Counter</p><{tag}><li></li></{tag}>" or edh() == f"<p>Counter</p><{tag}><li><br></li></{tag}>"
         put(f"<{tag}><li>a<{tag}><li><br></li></{tag}></li></{tag}>", "li li", 0); pg.keyboard.press("Enter"); res[tag + " 빈 하위 Enter"] = edh().startswith(f"<{tag}><li>a</li><li>")
+    put("<ul><li><b>CounterClockWise</b></li><li><b>타입</b></li><li><br></li><li><b>boolean</b></li></ul>", "li:nth-child(3)", 0); pg.keyboard.press("Shift+Tab"); pg.keyboard.type("!")
+    res["가운데 빈 항목 Shift+Tab → 그 항목만 지움"] = edh() == "<ul><li><b>CounterClockWise</b></li><li><b>타입!</b></li><li><b>boolean</b></li></ul>"
+    put("<ul><li><b>CounterClockWise</b></li><li><b>타입</b></li><li><br></li><li><b>boolean</b></li></ul>", "li:nth-child(3)", 0); pg.keyboard.press("Backspace")
+    res["가운데 빈 항목 Backspace → 지움"] = edh() == "<ul><li><b>CounterClockWise</b></li><li><b>타입</b></li><li><b>boolean</b></li></ul>"
     put("<p>들여쓰기</p>", "p", 0); pg.keyboard.press("Tab"); pg.keyboard.press("Tab"); r1 = edh(); pg.keyboard.press("Shift+Tab"); r2 = edh(); pg.keyboard.press("Control+z"); r3 = edh()
     res["보통 줄 Tab/Shift+Tab/되돌리기"] = r1 == '<p class="in-2">들여쓰기</p>' and r2 == '<p class="in-1">들여쓰기</p>' and r3 == '<p class="in-2">들여쓰기</p>'
     put("<table><tbody><tr><th>a</th><th>b</th></tr><tr><td>c</td><td>d</td></tr></tbody></table>", "th", 0); pg.keyboard.press("Tab"); pg.keyboard.type("X")

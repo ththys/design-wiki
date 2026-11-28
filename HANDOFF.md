@@ -79,7 +79,7 @@
 ### 본문 HTML
 - 저장·보기·붙여 넣기 모두 `sanitize()`를 거침. 허용 태그: `P H1~H6 B I U S SUB SUP MARK A UL OL LI BLOCKQUOTE PRE CODE HR BR TABLE THEAD TBODY TR TH TD FIGURE FIGCAPTION IMG VIDEO DIV` + `TIME.date`, `SPAN.status`. 글 속 `\u200b`(커서 빼기용)는 저장할 때 지움.
 - 특별한 모양: 패널 `div.panel.(info|note|warn|ok|err)`, 할 일 `ul.check > li(.done)`, 페이지 링크 `a.plink[data-page=id]`, 그림 크기 `figure.w-s|w-m`. 이미지·영상 주소는 `https://` 또는 `data:image/`만.
-- **목록·들여쓰기 키** (`listKeys()`, 페이지·댓글 공용): Tab=목록 항목 한 칸 들여쓰기(앞 항목 아래 하위 목록) / 보통 줄 `in-1~6` / 표 다음 칸(끝이면 줄 추가), Shift+Tab=반대, 첫 항목 맨 앞 Backspace=번호·글머리 없애기(`liftLi`), 빈 항목 Enter=내어쓰기·목록 끝내기.
+- **목록·들여쓰기 키** (`listKeys()`, 페이지·댓글 공용): Tab=목록 항목 한 칸 들여쓰기(앞 항목 아래 하위 목록) / 보통 줄 `in-1~6` / 표 다음 칸(끝이면 줄 추가), Shift+Tab=반대(빈 항목은 그 항목만 지움), 첫 항목 맨 앞 Backspace=번호·글머리 없애기(`liftLi`), 빈 항목 Enter=내어쓰기·목록 끝내기.
 - **되돌리기**: 브라우저 기본 되돌리기를 안 씀. 편집기(페이지·댓글 상자)마다 `ed.__u` 기록, `snapNow()`=바꾸기 직전 상태 저장, `doUndo()`. 글자 입력은 `beforeinput`에서 0.8초 덩어리로 기록. **DOM을 직접 바꾸는 새 기능을 넣으면 그 앞에 `snapNow()`를 꼭 부를 것**(안 그러면 Ctrl+Z로 안 돌아감). 키: Ctrl+Z·Alt+Z 되돌리기, Ctrl+Y·Ctrl+Shift+Z 다시.
 - 도구 막대 메뉴(패널·더 넣기)는 `showMenu`로 여는데, 문서 클릭이 메뉴를 닫으므로 여는 단추는 닫기 예외 목록(`[data-act]`, `[data-r]` 등)에 있어야 함.
 - **할 일 기한**: `ul.check>li` 안의 `time.date`는 `markDue()`가 지난 날짜=`.late`(빨강), 오늘=`.today`(노랑), 끝낸 일=`.doneD`(회색 줄)로 칠함(저장 안 되는 보기용 클래스). 줄 **중간**에서 `[] ` 쳐도 그 줄 전체가 할 일이 됨(`blockAuto`).

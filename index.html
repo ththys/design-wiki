@@ -1881,7 +1881,13 @@ function listKeys(e){
       let to = cells[i + (e.shiftKey ? -1 : 1)];
       if (!to && !e.shiftKey) { snapNow(); const row = cell.parentNode, nr = document.createElement("tr"); [...row.children].forEach(() => { const c = document.createElement("td"); c.innerHTML = "<br>"; nr.appendChild(c); }); row.after(nr); to = nr.firstChild; }
       if (to) { const r = document.createRange(); r.selectNodeContents(to); getSelection().removeAllRanges(); getSelection().addRange(r); } return true; }
-    const li = curLi(); if (li) { e.preventDefault(); snapNow(); keepCaret(() => e.shiftKey ? outdentLi(li) : indentLi(li)); markDue(ed); return true; }
+    const li = curLi(); if (li) { e.preventDefault(); snapNow();
+      const top = !(li.parentElement.parentElement && li.parentElement.parentElement.tagName === "LI");
+      if (e.shiftKey && top && liEmpty(li) && !subOf(li, li.parentNode.tagName) && (li.previousElementSibling || li.nextElementSibling)) { /* 빈 항목 Shift+Tab → 그 항목만 지우기 */
+        const prev = li.previousElementSibling, next = li.nextElementSibling; li.remove();
+        if (prev) { let t = prev; while (t.lastElementChild && /^(UL|OL)$/.test(t.lastElementChild.tagName)) t = t.lastElementChild.lastElementChild || t; caretIn(t, true); } else caretIn(next, false);
+        return true; }
+      keepCaret(() => e.shiftKey ? outdentLi(li) : indentLi(li)); markDue(ed); return true; }
     const b = el && el.closest("p,h1,h2,h3,h4,h5,h6"); if (b && ed.contains(b) && !b.classList.contains("xtitle")) { /* 보통 줄: 한 칸씩 들여쓰기 */
       e.preventDefault(); const lv = +((b.className.match(/\bin-(\d)/) || [])[1] || 0), nv = Math.max(0, Math.min(6, lv + (e.shiftKey ? -1 : 1)));
       if (nv !== lv) { snapNow(); b.classList.remove("in-" + lv); if (nv) b.classList.add("in-" + nv); if (!b.className) b.removeAttribute("class"); } return true; }
