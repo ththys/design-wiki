@@ -509,6 +509,10 @@ body.figsizing,body.figsizing *{cursor:nwse-resize!important;user-select:none}
 .opv-t tr.od{display:none} .doc .opv-t tr.od td{color:var(--sub);font-size:12px;white-space:pre-wrap;background:var(--panel);max-width:420px}
 
 .editor .opts{position:relative;cursor:pointer}
+.editor .bdel{position:absolute;top:-12px;left:86px;z-index:3;display:none;border:1px solid var(--line);background:var(--bg);color:var(--sub);border-radius:6px;font-size:12px;padding:3px 8px;cursor:pointer;box-shadow:var(--shadow)}
+.editor .bdel:hover{color:#e5484d;border-color:#e5484d}
+.editor .opts:hover>.bdel,.editor .flow:hover>.bdel,.editor .gantt:hover>.bdel,.editor .xsel>.bdel,.editor .xsel>.bdrag{display:block}
+.editor .xsel{outline:2px solid var(--brand);outline-offset:3px;border-radius:6px}
 .editor .bdrag{position:absolute;top:-12px;left:8px;box-shadow:var(--shadow);z-index:3;display:none;border:1px solid var(--line);background:var(--bg);color:var(--sub);border-radius:6px;font-size:12px;padding:3px 8px;cursor:grab;touch-action:none}
 .editor .opts:hover>.bdrag,.editor .flow:hover>.bdrag,.editor .gantt:hover>.bdrag,.editor .bd-src>.bdrag{display:block}
 .editor .flow,.editor .gantt{position:relative}
@@ -1556,7 +1560,7 @@ function showKeysFlow(){
 function prepFlowBlock(x){ /* 편집기 안: 미리보기 + 편집 단추 */
   x.contentEditable = "false"; x.innerHTML = "";
   const v = document.createElement("div"); x.appendChild(v); mountFlow(v, parseFlowAttr(x.getAttribute("data-flow")), { mini: true });
-  x.insertAdjacentHTML("afterbegin", `<button type="button" class="btn sm primary fe-open" data-fopen>✎ 플로우차트 편집</button><button type="button" class="bdrag" data-bdrag title="끌어서 옮기기 (표 칸 안에도 넣을 수 있어요)">⠿ 옮기기</button>`);
+  x.insertAdjacentHTML("afterbegin", `<button type="button" class="btn sm primary fe-open" data-fopen>✎ 플로우차트 편집</button><button type="button" class="bdrag" data-bdrag title="끌어서 옮기기 (표 칸 안에도 넣을 수 있어요)">⠿ 옮기기</button><button type="button" class="bdel" data-bdel title="이 블록 지우기 (골라서 Delete 키도 돼요)">🗑 지우기</button>`);
 }
 
 /* ───────── 간트 차트 (div.gantt[data-gantt]) ───────── */
@@ -1685,7 +1689,7 @@ function openGanttEditor(block, isNew){
 function prepGanttBlock(x){
   x.contentEditable = "false"; x.innerHTML = "";
   const v = document.createElement("div"); x.appendChild(v); mountGantt(v, parseGanttAttr(x.getAttribute("data-gantt")));
-  x.insertAdjacentHTML("afterbegin", `<button type="button" class="btn sm primary fe-open" data-gopen>✎ 간트 차트 편집</button><button type="button" class="bdrag" data-bdrag title="끌어서 옮기기 (표 칸 안에도 넣을 수 있어요)">⠿ 옮기기</button>`);
+  x.insertAdjacentHTML("afterbegin", `<button type="button" class="btn sm primary fe-open" data-gopen>✎ 간트 차트 편집</button><button type="button" class="bdrag" data-bdrag title="끌어서 옮기기 (표 칸 안에도 넣을 수 있어요)">⠿ 옮기기</button><button type="button" class="bdel" data-bdel title="이 블록 지우기 (골라서 Delete 키도 돼요)">🗑 지우기</button>`);
 }
 
 /* ───────── 표 정렬 (컨플루언스처럼 머리 행 눌러서) ───────── */
@@ -2057,7 +2061,7 @@ document.addEventListener("click", e => { if (optTipPin && !e.target.closest("tr
 addEventListener("hashchange", () => { optTipPin = null; hideOptTip(); });
 function prepOptsBlock(x){
   x.contentEditable = "false"; mountOpts(x, parseOptsAttr(x.getAttribute("data-opts")));
-  x.insertAdjacentHTML("afterbegin", `<button type="button" class="btn sm primary fe-open" data-oopen>✎ 옵션 패널 편집</button><button type="button" class="bdrag" data-bdrag title="끌어서 옮기기 (표 칸 안에도 넣을 수 있어요)">⠿ 옮기기</button>`);
+  x.insertAdjacentHTML("afterbegin", `<button type="button" class="btn sm primary fe-open" data-oopen>✎ 옵션 패널 편집</button><button type="button" class="bdrag" data-bdrag title="끌어서 옮기기 (표 칸 안에도 넣을 수 있어요)">⠿ 옮기기</button><button type="button" class="bdel" data-bdel title="이 블록 지우기 (골라서 Delete 키도 돼요)">🗑 지우기</button>`);
 }
 function openOptsEditor(block, isNew){
   let d = parseOptsAttr(block.getAttribute("data-opts")); let dirty = false;
@@ -2250,22 +2254,71 @@ function wireColResize(){
 /* 드래그로 고른 '프로퍼티 설명'을 옵션 패널 줄로 바꾸기
    이름 줄(문단) 다음에 목록: "데이터 타입 : Int", "기본 값 : 0", "단위 : …", "동작 : …" … 형식이 안 맞으면 null */
 function optsFromRange(rg){
-  const blocks = [...ed.querySelectorAll("p,h1,h2,h3,h4,h5,h6,ul,ol")].filter(b => !b.parentElement.closest("li,.opts,.flow,.gantt,table") && rg.intersectsNode(b));
-  const txt = el => (el.textContent || "").replace(/[​]/g, "").replace(/ /g, " ").trim();
-  const liLines = (list, depth) => [...list.children].filter(x => x.tagName === "LI").flatMap(li => { const c = li.cloneNode(true); c.querySelectorAll("ul,ol").forEach(x => x.remove());
-    return [{ t: txt(c), depth }, ...[...li.children].filter(x => /^(UL|OL)$/.test(x.tagName)).flatMap(x => liLines(x, depth + 1))]; });
+  /* 고른 범위를 줄 목록으로 펴기: 목록이 아닌 줄 = 이름 후보, 목록 줄 = 속성 (목록 속 문단·div로 들어간 줄도 찾음) */
+  const txt = el => (el.textContent || "").replace(/[​]/g, "").replace(/ /g, " ").replace(/\s+/g, " ").trim();
+  const lines = [], SKIP = "div.opts,div.flow,div.gantt,table,figure,pre,.toc,.include";
+  const isBlockEl = x => x.nodeType === 1 && /^(P|H[1-6]|DIV|UL|OL|BLOCKQUOTE|TABLE|FIGURE|PRE)$/.test(x.tagName);
+  const walk = (node, depth, pin) => { [...node.children].forEach(x => {
+    if (x.matches(SKIP)) return;
+    if (/^(UL|OL)$/.test(x.tagName)) { [...x.children].forEach(li => li.tagName === "LI" && doLi(li, depth, pin)); return; }
+    if (/^(P|H[1-6]|BLOCKQUOTE)$/.test(x.tagName) || (x.tagName === "DIV" && ![...x.children].some(isBlockEl))) { if (pin || rg.intersectsNode(x)) { const t = txt(x); if (t) lines.push({ t, li: false, depth }); } return; }
+    if (x.tagName === "DIV") walk(x, depth, pin); }); };
+  const doLi = (li, depth, pin) => { let own = "", after = false; const inR = pin || rg.intersectsNode(li);
+    [...li.childNodes].forEach(c => { if (c.nodeType === 1 && /^(UL|OL)$/.test(c.tagName)) { if (!after) { after = true; if (own.trim() && inR) lines.push({ t: own.replace(/\s+/g, " ").trim(), li: true, depth }); own = ""; } walk({ children: [c] }, depth + 1, inR); return; }
+      if (!after && own.trim() && c.nodeType === 1 && isBlockEl(c)) { after = true; if (inR) lines.push({ t: own.replace(/\s+/g, " ").trim(), li: true, depth }); own = ""; }
+      if (after && c.nodeType === 1 && isBlockEl(c)) { walk({ children: [c] }, depth, inR); return; }
+      if (after && c.nodeType === 3 && !c.data.trim()) return;
+      own += (c.textContent || "").replace(/[​]/g, "").replace(/ /g, " ") + (c.nodeType === 1 && isBlockEl(c) ? " " : ""); });
+    if (!after && own.trim() && inR) lines.push({ t: own.replace(/\s+/g, " ").trim(), li: true, depth }); };
+  walk(ed, 0);
   const typeOf = v => { const t = v.toLowerCase(); return /^(int|integer|float|double|number|숫자|정수|실수)/.test(t) ? "num" : /^(bool|boolean|체크)/.test(t) ? "check" : /^(enum|열거|드롭)/.test(t) ? "enum" : "text"; };
-  let title = "", rows = [];
-  blocks.forEach((b, i) => { if (/^(UL|OL)$/.test(b.tagName)) return; const name = txt(b); if (!name) return;
-    const nx = blocks[i + 1]; if (!nx || !/^(UL|OL)$/.test(nx.tagName)) { if (!rows.length && !title) title = name; return; }
-    const row = { n: name.slice(0, 80), t: "text", v: "" }, desc = [];
-    liLines(nx, 0).forEach(({ t, depth }) => { if (!t) return; const m = /^([^:：]{1,20}?)\s*[:：]\s*(.*)$/.exec(t);
-      const key = m && depth === 0 ? m[1].replace(/\s+/g, "") : "";
-      if (/^(데이터타입|타입|자료형|type|datatype)$/i.test(key)) { row.t = typeOf(m[2]); if (row.t === "text" && m[2]) desc.push("타입: " + m[2].trim()); }
-      else if (/^(기본값|기본|default|defaultvalue)$/i.test(key)) row.v = m[2].trim();
-      else desc.push((depth ? "  ".repeat(depth) + "- " : "") + (m && depth === 0 ? m[1].trim() + ": " + m[2].trim() : t)); });
-    if (row.t === "check") row.v = /^(true|1|on|켬|예)$/i.test(row.v); if (desc.length) row.d = desc.join("\n").slice(0, 2000); rows.push(row); });
+  let title = "", rows = [], row = null, base = 0, desc = [];
+  const flush = () => { if (!row) return; if (row.t === "check") row.v = /^(true|1|on|켬|예)$/i.test(row.v); if (desc.length) row.d = desc.join("\n").slice(0, 2000); rows.push(row); row = null; desc = []; };
+  lines.forEach((ln, k) => {
+    if (!ln.li) { const nx = lines[k + 1]; flush();
+      if (nx && nx.li) { row = { n: ln.t.slice(0, 80), t: "text", v: "" }; base = nx.depth; }
+      else if (!rows.length && !title) title = ln.t; return; }
+    if (!row) return; const rel = ln.depth - base, m = /^([^:：]{1,20}?)\s*[:：]\s*(.*)$/.exec(ln.t), key = m && rel <= 0 ? m[1].replace(/\s+/g, "") : "";
+    if (/^(데이터타입|타입|자료형|type|datatype)$/i.test(key)) { row.t = typeOf(m[2]); if (row.t === "text" && m[2]) desc.push("타입: " + m[2].trim()); }
+    else if (/^(기본값|기본|default|defaultvalue)$/i.test(key)) row.v = m[2].trim();
+    else desc.push((rel > 0 ? "  ".repeat(rel) + "- " : "") + (key ? m[1].trim() + ": " + m[2].trim() : ln.t)); });
+  flush();
   return rows.length ? cleanOpts({ title, rows }) : null;
+}
+
+/* 옵션 패널·플로우·간트 블록: 고르기 / 지우기 / 편집 열기 */
+let xSel = null;
+function selXBlock(b){ if (xSel && xSel !== b) xSel.classList.remove("xsel"); xSel = b; if (b) { b.classList.add("xsel"); const s = getSelection(); s.removeAllRanges(); } }
+function openXEditor(b){ b.classList.contains("opts") ? openOptsEditor(b) : b.classList.contains("flow") ? openFlowEditor(b) : openGanttEditor(b); }
+function delXBlock(b){ snapNow(); const nx = b.nextElementSibling, pv = b.previousElementSibling, box = b.parentNode; b.remove(); if (xSel === b) xSel = null;
+  if (box && /^T[DH]$/.test(box.nodeName) && !box.childNodes.length) box.innerHTML = "<br>";
+  const t = nx && nx.matches("p,h1,h2,h3,h4,h5,h6") ? nx : pv && pv.matches("p,h1,h2,h3,h4,h5,h6") ? pv : null;
+  if (t) caretIn(t, t === pv); else { const p = document.createElement("p"); p.innerHTML = "<br>"; nx ? nx.before(p) : (box || ed).appendChild(p); caretIn(p); } saveSel(); }
+function xBlockKeys(e){
+  if (e.isComposing) return false;
+  if (xSel && ed.contains(xSel)) {
+    if (e.key === "Backspace" || e.key === "Delete") { e.preventDefault(); delXBlock(xSel); return true; }
+    if (e.key === "Enter") { e.preventDefault(); const b = xSel; selXBlock(null); openXEditor(b); return true; }
+    if (e.key === "Escape" || e.key.startsWith("Arrow")) { const b = xSel; selXBlock(null); e.preventDefault(); const t = (e.key === "ArrowUp" || e.key === "ArrowLeft") ? b.previousElementSibling : b.nextElementSibling;
+      if (t && t.matches("p,h1,h2,h3,h4,h5,h6,li")) caretIn(t, e.key === "ArrowUp" || e.key === "ArrowLeft"); return true; }
+    if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) selXBlock(null);
+    return false;
+  }
+  if (e.key !== "Backspace" && e.key !== "Delete") return false;
+  const s = getSelection(); if (!s.rangeCount) return false; const r = s.getRangeAt(0);
+  if (!s.isCollapsed) { /* 드래그로 고른 범위에 블록이 있으면 같이 지우기 */
+    const hit = [...ed.querySelectorAll("div.opts,div.flow,div.gantt")].filter(b => r.intersectsNode(b)); if (!hit.length) return false;
+    e.preventDefault(); snapNow(); const sc = r.startContainer, so = r.startOffset;
+    hit.forEach(b => b.remove()); try { if (!s.isCollapsed && s.rangeCount && !s.getRangeAt(0).collapsed) document.execCommand("delete"); } catch {}
+    if (!ed.textContent.trim() && !ed.querySelector("img,video,table,hr,div")) { ed.innerHTML = "<p><br></p>"; caretIn(ed.firstChild); }
+    return true; }
+  /* 빈 줄 바로 뒤/앞 블록: Backspace면 위 블록, Delete면 아래 블록을 먼저 고르기 */
+  const n = r.startContainer, blk = (n.nodeType === 1 ? n : n.parentElement).closest("p,h1,h2,h3,h4,h5,h6"); if (!blk || !ed.contains(blk)) return false;
+  const pre = document.createRange(); pre.setStart(blk, 0); pre.setEnd(r.startContainer, r.startOffset);
+  const post = document.createRange(); post.setStart(r.startContainer, r.startOffset); post.setEnd(blk, blk.childNodes.length);
+  const nb = e.key === "Backspace" ? (!pre.toString().replace(/​/g, "") && blk.previousElementSibling) : (!post.toString().replace(/​/g, "") && blk.nextElementSibling);
+  if (nb && nb.matches("div.opts,div.flow,div.gantt")) { e.preventDefault(); if (!blk.textContent.replace(/[\s ​]/g, "") && !blk.querySelector("img,video,span,time") && e.key === "Backspace") { snapNow(); blk.remove(); } selXBlock(nb); return true; }
+  return false;
 }
 
 /* ───────── 라우팅 ───────── */
@@ -2754,6 +2807,7 @@ function wireEditor(id, isNew){
     if (pickState && pickKey(e)) return;
     if (listKeys(e)) { syncBar(); return; }
     if (panelKeys(e)) { syncBar(); return; }
+    if (xBlockKeys(e)) { syncBar(); return; }
     if (e.key === "Enter" && !e.isComposing) snapNow();
     if (!e.isComposing && editKeys(e)) return;
     if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { /* --- 또는 *** 치고 Enter → 구분선 */
@@ -2776,10 +2830,15 @@ function wireEditor(id, isNew){
 ;
   wireColResize();
   ed.addEventListener("pointerdown", e => { const h = e.target.closest("[data-bdrag]"); if (h && ed.contains(h)) startBlockDrag(e, h.closest("div.opts,div.flow,div.gantt")); }, true);
+  ed.addEventListener("dblclick", e => { const xb = e.target.closest("div.opts,div.flow,div.gantt"); if (xb && ed.contains(xb) && !e.target.closest("button")) { selXBlock(null); openXEditor(xb); } });
   ed.addEventListener("click", e => {
     if (e.target.closest("[data-bdrag]")) { e.preventDefault(); return; }
-    const ob = e.target.closest("div.opts"); if (ob && ed.contains(ob)) { if (e.target.closest("[data-oopen]") || !e.target.closest("tr.hasd")) openOptsEditor(ob); return; }
-    const fb = e.target.closest("div.flow,div.gantt"); if (fb && ed.contains(fb)) { if (e.target.closest("[data-fopen],[data-gopen]") || !e.target.closest(".fc-bar,.gt-bar-top,[data-gi],.fc-tip")) { fb.classList.contains("flow") ? openFlowEditor(fb) : openGanttEditor(fb); } return; }
+    const xb = e.target.closest("div.opts,div.flow,div.gantt"); if (xb && ed.contains(xb)) { /* 한 번 누르면 고르기(Delete로 지우기), 편집 단추나 두 번 누르면 편집 */
+      if (e.target.closest("[data-bdel]")) { delXBlock(xb); return; }
+      if (e.target.closest("[data-oopen],[data-fopen],[data-gopen]")) { selXBlock(null); openXEditor(xb); return; }
+      if (e.target.closest("tr.hasd,.fc-bar,.gt-bar-top,[data-gi],.fc-tip")) return;
+      selXBlock(xb); return; }
+    selXBlock(null);
     const ick = e.target.closest("span.ick"); if (ick && ed.contains(ick)) { snapNow(); ick.classList.toggle("on"); e.preventDefault(); return; }
     const chip = e.target.closest("time.date,span.status"); if (chip && ed.contains(chip)) { chip.tagName === "TIME" ? openDatePop(chip, true) : openStatusPop(chip); return; }
     const li = e.target.closest("ul.check>li"); if (li) { const r = li.getBoundingClientRect(); if (e.clientX - r.left < 26) { snapNow(); li.classList.toggle("done"); markDue(li); e.preventDefault(); } }

@@ -609,12 +609,36 @@ with sync_playwright() as p:
     names = pg.locator('#opRows [data-f="n"]').evaluate_all("els => els.map(x => x.value)")
     ttl = pg.locator("#opTitle").input_value(); kinds = pg.locator('#opRows select').evaluate_all("els => els.map(x => x.value)")
     descs = pg.locator('#opRows [data-f="d"]').evaluate_all("els => els.map(x => x.value)")
-    ok_fill = ttl == "프로퍼티" and names == ["MoveDistance", "PassThrough"] and kinds[:2] == ["num", "check"] and "단위: 1 = 1uu" in descs[0] and "AcceptanceRadius" in descs[1]
     pg.click('[data-oe="ok"]'); pg.wait_for_timeout(150)
-    pg.evaluate("(() => { const e = document.querySelector('#ed'); caretIn(e.lastElementChild, true); saveSel(); insertKind('opts'); })()"); pg.wait_for_timeout(200)
+    # 목록 안에 문단으로 들어간 마지막 이름(PassThrough)·div 줄도 찾기
+    pg.evaluate("""(() => { const e = document.querySelector('#ed'); e.innerHTML = '<p>Acc</p><ul><li>데이터 타입 : Int</li><li>동작 : 멈춤<p>PassThrough</p><ul><li>데이터 타입: boolean</li><li>기본 값: true</li></ul></li></ul><div>Third</div><ul><li>데이터 타입: Float</li></ul><p>끝</p>';
+      const r = document.createRange(); r.setStart(e.firstChild.firstChild, 0); r.setEnd(e.querySelectorAll('ul')[2].lastElementChild, 1); getSelection().removeAllRanges(); getSelection().addRange(r); saveSel(); insertKind('opts'); })()""")
+    pg.wait_for_timeout(200)
+    names2 = pg.locator('#opRows [data-f="n"]').evaluate_all("els => els.map(x => x.value)")
+    ok_fill = names2 == ["Acc", "PassThrough", "Third"] and ttl == "프로퍼티" and names == ["MoveDistance", "PassThrough"] and kinds[:2] == ["num", "check"] and "단위: 1 = 1uu" in descs[0] and "AcceptanceRadius" in descs[1]
+    pg.click('[data-oe="ok"]'); pg.wait_for_timeout(150)
+    pg.evaluate("(() => { const e = document.querySelector('#ed'); e.innerHTML = '<p>x</p>'; caretIn(e.lastElementChild, true); saveSel(); insertKind('opts'); })()"); pg.wait_for_timeout(200)
     ok_empty = pg.locator("#opTitle").input_value() == "" and pg.locator('#opRows [data-f="n"]').count() == 1
-    check("드래그한 프로퍼티 설명 → 옵션 패널 자동 채우기 / 안 고르면 빈 패널", ok_fill and ok_empty, f"{ttl},{names},{kinds},{descs},{ok_empty}")
+    check("드래그한 프로퍼티 설명 → 옵션 패널 자동 채우기 / 안 고르면 빈 패널", ok_fill and ok_empty, f"{ttl},{names},{names2},{kinds},{descs},{ok_empty}")
     pg.click('[data-oe="ok"]'); pg.wait_for_timeout(150)
+    pg.click("#edCancel"); pg.wait_for_timeout(100)
+    if pg.locator("#askOk").count(): pg.click("#askOk"); pg.wait_for_timeout(200)
+
+    # 38) 옵션 패널: 한 번 누르면 고르기(편집 안 열림)·Delete로 지우기·지우기 단추·드래그 범위 지우기·두 번 누르면 편집
+    pg.goto(URL + "#/"); pg.wait_for_timeout(150); pg.click("#createBtn"); pg.wait_for_timeout(250); pg.fill("#edTitle", "블록 지우기"); pg.click("#ed")
+    mk = "(() => { const e = document.querySelector('#ed'); const d = JSON.stringify({ title: 'T', rows: [{ n: 'A', t: 'num', v: '1' }] }).replace(/\"/g, '&quot;'); e.innerHTML = sanitize('<p>위</p><div class=\"opts\" data-opts=\"' + d + '\"></div><p>아래</p>'); prepEditor(e); })()"
+    pg.evaluate(mk); pg.wait_for_timeout(100)
+    pg.locator("#ed div.opts .opv-h").click(); pg.wait_for_timeout(100)
+    sel1 = pg.locator("#ed div.opts.xsel").count() == 1 and pg.locator("#opRows").count() == 0
+    pg.keyboard.press("Delete"); pg.wait_for_timeout(80); gone1 = pg.locator("#ed div.opts").count() == 0
+    pg.keyboard.press("Control+z"); pg.wait_for_timeout(80); back = pg.locator("#ed div.opts").count() == 1
+    pg.locator("#ed div.opts").hover(); pg.locator("#ed div.opts [data-bdel]").click(); pg.wait_for_timeout(80); gone2 = pg.locator("#ed div.opts").count() == 0
+    pg.evaluate(mk); pg.wait_for_timeout(100)
+    pg.evaluate("(() => { const ps = document.querySelectorAll('#ed p'); const r = document.createRange(); r.setStart(ps[0].firstChild, 1); r.setEnd(ps[1].firstChild, 1); getSelection().removeAllRanges(); getSelection().addRange(r); })()")
+    pg.keyboard.press("Backspace"); pg.wait_for_timeout(80); gone3 = pg.locator("#ed div.opts").count() == 0
+    pg.evaluate(mk); pg.wait_for_timeout(100); pg.locator("#ed div.opts .opv-h").dblclick(); pg.wait_for_timeout(200); opened = pg.locator("#opRows").count() == 1
+    check("옵션 패널 고르기·Delete·지우기 단추·드래그 지우기·두 번 눌러 편집", sel1 and gone1 and back and gone2 and gone3 and opened, f"{sel1},{gone1},{back},{gone2},{gone3},{opened}")
+    if opened: pg.click('[data-oe="ok"]'); pg.wait_for_timeout(150)
     pg.click("#edCancel"); pg.wait_for_timeout(100)
     if pg.locator("#askOk").count(): pg.click("#askOk"); pg.wait_for_timeout(200)
     check("자바스크립트 오류 없음", not errs, "; ".join(errs[:3]))
