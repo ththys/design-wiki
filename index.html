@@ -2061,7 +2061,7 @@ function prepOptsBlock(x){
 }
 function openOptsEditor(block, isNew){
   let d = parseOptsAttr(block.getAttribute("data-opts")); let dirty = false;
-  if (!d.rows.length && isNew) d = { title: "MoveClockWise", rows: [{ n: "ENUM_AggroTargetType", t: "enum", v: "" }, { n: "CounterClockWise", t: "check", v: false }, { n: "MoveRangeMin", t: "num", v: "" }, { n: "MoveRangeMax", t: "num", v: "" }, { n: "TimeOut", t: "num", v: "" }] };
+  if (!d.rows.length && isNew) d = { title: "", rows: [{ n: "", t: "text", v: "" }] };
   modal(`<header class="fe-hd"><h2>옵션 패널 편집</h2><div class="fe-tools"><input id="opTitle" placeholder="패널 제목 (예: MoveClockWise)" value="${esc(d.title)}" style="width:240px"></div><span class="grow"></span><button class="btn subtle" data-oe="cancel">취소</button><button class="btn primary" data-oe="ok">적용</button></header>
     <div class="op-body"><div class="ge-tbl"><table><thead><tr><th></th><th>이름</th><th>칸 종류</th><th>값 (예시)</th><th>설명 <small>마우스 올리면 보임</small></th><th></th></tr></thead><tbody id="opRows"></tbody></table>
       <div class="fe-row" style="margin-top:8px"><button class="btn sm" data-oe="add">+ 줄 추가</button><small class="fe-mut">엑셀에서 <b>이름 · 값 · 설명</b> 열을 복사해 이름 칸에 붙여 넣으면 한꺼번에 들어가요 (true/false → 체크박스, 숫자 → 숫자, ENUM_ → 드롭다운)</small></div></div>
@@ -2245,6 +2245,27 @@ function wireColResize(){
     addEventListener("pointermove", mv); addEventListener("pointerup", up);
   }, true);
   ed.addEventListener("dblclick", e => { const hit = colEdgeAt(e); if (!hit) return; e.preventDefault(); snapNow(); hit.cells.forEach(c => c.removeAttribute("width")); });
+}
+
+/* 드래그로 고른 '프로퍼티 설명'을 옵션 패널 줄로 바꾸기
+   이름 줄(문단) 다음에 목록: "데이터 타입 : Int", "기본 값 : 0", "단위 : …", "동작 : …" … 형식이 안 맞으면 null */
+function optsFromRange(rg){
+  const blocks = [...ed.querySelectorAll("p,h1,h2,h3,h4,h5,h6,ul,ol")].filter(b => !b.parentElement.closest("li,.opts,.flow,.gantt,table") && rg.intersectsNode(b));
+  const txt = el => (el.textContent || "").replace(/[​]/g, "").replace(/ /g, " ").trim();
+  const liLines = (list, depth) => [...list.children].filter(x => x.tagName === "LI").flatMap(li => { const c = li.cloneNode(true); c.querySelectorAll("ul,ol").forEach(x => x.remove());
+    return [{ t: txt(c), depth }, ...[...li.children].filter(x => /^(UL|OL)$/.test(x.tagName)).flatMap(x => liLines(x, depth + 1))]; });
+  const typeOf = v => { const t = v.toLowerCase(); return /^(int|integer|float|double|number|숫자|정수|실수)/.test(t) ? "num" : /^(bool|boolean|체크)/.test(t) ? "check" : /^(enum|열거|드롭)/.test(t) ? "enum" : "text"; };
+  let title = "", rows = [];
+  blocks.forEach((b, i) => { if (/^(UL|OL)$/.test(b.tagName)) return; const name = txt(b); if (!name) return;
+    const nx = blocks[i + 1]; if (!nx || !/^(UL|OL)$/.test(nx.tagName)) { if (!rows.length && !title) title = name; return; }
+    const row = { n: name.slice(0, 80), t: "text", v: "" }, desc = [];
+    liLines(nx, 0).forEach(({ t, depth }) => { if (!t) return; const m = /^([^:：]{1,20}?)\s*[:：]\s*(.*)$/.exec(t);
+      const key = m && depth === 0 ? m[1].replace(/\s+/g, "") : "";
+      if (/^(데이터타입|타입|자료형|type|datatype)$/i.test(key)) { row.t = typeOf(m[2]); if (row.t === "text" && m[2]) desc.push("타입: " + m[2].trim()); }
+      else if (/^(기본값|기본|default|defaultvalue)$/i.test(key)) row.v = m[2].trim();
+      else desc.push((depth ? "  ".repeat(depth) + "- " : "") + (m && depth === 0 ? m[1].trim() + ": " + m[2].trim() : t)); });
+    if (row.t === "check") row.v = /^(true|1|on|켬|예)$/i.test(row.v); if (desc.length) row.d = desc.join("\n").slice(0, 2000); rows.push(row); });
+  return rows.length ? cleanOpts({ title, rows }) : null;
 }
 
 /* ───────── 라우팅 ───────── */
@@ -2951,7 +2972,9 @@ function insertKind(k){
   else if (k === "status") { const sp = newChip(statusChip()); if (sp) openStatusPop(sp, true); }
   else if (["expand", "layout2", "layout3", "toc", "decision"].includes(k)) { const [el, f] = mkBlock(k); insertBlock(el, f || undefined); if (k === "toc") prepEditor(ed); }
   else if (k === "include") openPicker("", "include");
-  else if (k === "opts") { const x = document.createElement("div"); x.className = "opts"; x.setAttribute("data-opts", "{}"); insertBlock(x); openOptsEditor(x, true); }
+  else if (k === "opts") { const sel = getSelection(), rg = sel.rangeCount && !sel.isCollapsed && ed.contains(sel.anchorNode) ? sel.getRangeAt(0).cloneRange() : null;
+    const got = rg ? optsFromRange(rg) : null; if (rg) { const r = rg.cloneRange(); r.collapse(false); sel.removeAllRanges(); sel.addRange(r); saveSel(); }
+    const x = document.createElement("div"); x.className = "opts"; x.setAttribute("data-opts", got ? JSON.stringify(got) : "{}"); insertBlock(x); openOptsEditor(x, true); }
   else if (k === "side") { const el = document.createElement("div"); el.className = "cols c2 fit"; el.innerHTML = `<div class="col"><p><br></p></div><div class="col"><p><br></p></div>`; insertBlock(el, el.querySelector("p")); }
   else if (k === "flow" || k === "gantt") { const x = document.createElement("div"); x.className = k; x.setAttribute("data-" + k, "{}"); insertBlock(x); k === "flow" ? openFlowEditor(x, true) : openGanttEditor(x, true); }
   else if (k === "emoji") { document.execCommand("insertText", false, " :"); const s = getSelection(); openSlash(s.anchorNode, s.anchorOffset, "emoji"); }

@@ -458,11 +458,11 @@ with sync_playwright() as p:
     open(png, "wb").write(base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAFklEQVR4nGP8z0AaYBzVMKphVAN9NQAAjd8B/1m7l3kAAAAASUVORK5CYII="))
     pg.goto(URL + "#/"); pg.wait_for_timeout(150); pg.click("#createBtn"); pg.wait_for_timeout(250); pg.fill("#edTitle", "옵션 시험"); pg.click("#ed")
     pg.keyboard.type("/options"); pg.wait_for_timeout(100); pg.keyboard.press("Enter"); pg.wait_for_timeout(300)
-    dflt = pg.locator("#opRows tr").count() == 5 and pg.locator("#opPrev .opv-h", has_text="MoveClockWise").count() == 1
-    pg.click('[data-oe="add"]'); pg.wait_for_timeout(50); last = pg.locator('#opRows [data-f="n"]').last
+    dflt = pg.locator("#opRows tr").count() == 1 and pg.locator("#opTitle").input_value() == "" and pg.locator('#opRows [data-f="n"]').first.input_value() == ""
+    last = pg.locator('#opRows [data-f="n"]').last
     last.evaluate("(el, t) => { const dt = new DataTransfer(); dt.setData('text/plain', t); el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true })); }", "DoNotLookAtTarget\tfalse\t대상을 보지 않음\nMoveSpeedRate\t1.5\nENUM_MoveSpeed\tWalk")
     pg.wait_for_timeout(100)
-    pasted = pg.locator("#opRows tr").count() == 8 and pg.locator("#opPrev .ock").count() == 2 and pg.locator("#opPrev .oin.sel", has_text="Walk").count() == 1 and pg.locator("#opPrev .oin.num", has_text="1.5").count() == 1
+    pasted = pg.locator("#opRows tr").count() == 3 and pg.locator("#opPrev .ock").count() == 1 and pg.locator("#opPrev .oin.sel", has_text="Walk").count() == 1 and pg.locator("#opPrev .oin.num", has_text="1.5").count() == 1
     pg.click('[data-oe="ok"]'); pg.wait_for_timeout(200); in_ed = pg.locator("#ed div.opts .opv").count() == 1
     # 나란히: 왼쪽 이미지, 오른쪽 옵션 패널
     pg.locator("#ed > p").last.click(); pg.keyboard.type("/side"); pg.wait_for_timeout(100); pg.keyboard.press("Enter"); pg.wait_for_timeout(100)
@@ -599,6 +599,23 @@ with sync_playwright() as p:
     pg.keyboard.press("Backspace"); pg.keyboard.press("Backspace"); pg.wait_for_timeout(80); still = pg.locator("#pick").count() == 1
     check("/ 메뉴: 틀려서 닫혀도 지우면 다시 열림", closed and reopened and still, f"{closed},{reopened},{still}")
     pg.keyboard.press("Escape"); pg.click("#edCancel"); pg.wait_for_timeout(100)
+    if pg.locator("#askOk").count(): pg.click("#askOk"); pg.wait_for_timeout(200)
+
+    # 37) 프로퍼티 설명을 드래그 → 옵션 패널 자동 채우기 / 안 고르면 빈 패널
+    pg.goto(URL + "#/"); pg.wait_for_timeout(150); pg.click("#createBtn"); pg.wait_for_timeout(250); pg.fill("#edTitle", "프로퍼티"); pg.click("#ed")
+    pg.evaluate("""(() => { const e = document.querySelector('#ed'); e.innerHTML = '<p>프로퍼티</p><p>MoveDistance</p><ul><li>데이터 타입 : Int</li><li>단위 : 1 = 1uu (100 = 1m)</li><li>동작 : 이동 거리</li></ul><p>PassThrough</p><ul><li>데이터 타입: boolean</li><li>기본 값: false</li><li>동작 : 뚫기<ul><li>AcceptanceRadius 안 먹음</li></ul></li></ul><p>끝</p>';
+      const ps = e.querySelectorAll('p'); const r = document.createRange(); r.setStart(ps[0].firstChild, 0); r.setEnd(e.querySelectorAll('ul')[1].lastElementChild, 1); getSelection().removeAllRanges(); getSelection().addRange(r); saveSel(); insertKind('opts'); })()""")
+    pg.wait_for_timeout(200)
+    names = pg.locator('#opRows [data-f="n"]').evaluate_all("els => els.map(x => x.value)")
+    ttl = pg.locator("#opTitle").input_value(); kinds = pg.locator('#opRows select').evaluate_all("els => els.map(x => x.value)")
+    descs = pg.locator('#opRows [data-f="d"]').evaluate_all("els => els.map(x => x.value)")
+    ok_fill = ttl == "프로퍼티" and names == ["MoveDistance", "PassThrough"] and kinds[:2] == ["num", "check"] and "단위: 1 = 1uu" in descs[0] and "AcceptanceRadius" in descs[1]
+    pg.click('[data-oe="ok"]'); pg.wait_for_timeout(150)
+    pg.evaluate("(() => { const e = document.querySelector('#ed'); caretIn(e.lastElementChild, true); saveSel(); insertKind('opts'); })()"); pg.wait_for_timeout(200)
+    ok_empty = pg.locator("#opTitle").input_value() == "" and pg.locator('#opRows [data-f="n"]').count() == 1
+    check("드래그한 프로퍼티 설명 → 옵션 패널 자동 채우기 / 안 고르면 빈 패널", ok_fill and ok_empty, f"{ttl},{names},{kinds},{descs},{ok_empty}")
+    pg.click('[data-oe="ok"]'); pg.wait_for_timeout(150)
+    pg.click("#edCancel"); pg.wait_for_timeout(100)
     if pg.locator("#askOk").count(): pg.click("#askOk"); pg.wait_for_timeout(200)
     check("자바스크립트 오류 없음", not errs, "; ".join(errs[:3]))
     b.close()
