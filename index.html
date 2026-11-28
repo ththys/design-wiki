@@ -1921,7 +1921,7 @@ async function movePage(id, parent, refId, after){
   catch (ex) { toast(errMsg(ex)); }
 }
 function closeMenus(){ document.querySelectorAll(".menu").forEach(m => m.remove()); }
-document.addEventListener("click", e => { if (!e.target.closest(".menu,[data-tmore],#meBtn,#pMore,#themeBtn,#noteBtn,[data-cre]")) closeMenus(); });
+document.addEventListener("click", e => { if (!e.target.closest(".menu,[data-tmore],#meBtn,#pMore,#themeBtn,#noteBtn,[data-cre],[data-act=more]")) closeMenus(); });
 function showMenu(items, anchor, x, y){
   closeMenus(); const m = document.createElement("div"); m.className = "menu";
   m.innerHTML = items.map((it, i) => it === "-" ? "<hr>" : it.head ? `<div class="mhd">${esc(it.head)}</div>` : `<button type="button" data-i="${i}" class="${it.danger ? "danger" : ""}">${esc(it.label)}</button>`).join("");

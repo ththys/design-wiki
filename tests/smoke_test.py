@@ -355,6 +355,15 @@ with sync_playwright() as p:
     pg.click("#edCancel"); pg.wait_for_timeout(100)
     if pg.locator("#askOk").count(): pg.click("#askOk"); pg.wait_for_timeout(200)
     check("한글 입력 중 검색: @ㅇ·@이여 → 이영호, @ㄱㄱㅎ(초성) → 김기획, /ㅈ·/저 → 접기", all(x is True for x in ok_steps) and picked and cho and sl and sl2, f"{ok_steps},{picked},{cho},{sl},{sl2}")
+
+    # 22) 도구 막대 '+ 더 넣기' 메뉴 → 플로우차트
+    pg.goto(URL + "#/"); pg.wait_for_timeout(150); pg.click("#createBtn"); pg.wait_for_timeout(250); pg.fill("#edTitle", "더 넣기 확인"); pg.click("#ed")
+    pg.click('[data-act="more"]'); pg.wait_for_timeout(150); menu_ok = pg.locator(".menu button", has_text="플로우차트").count() == 1
+    pg.locator(".menu button", has_text="플로우차트").click(); pg.wait_for_timeout(300); fe = pg.locator("#feCanvas").count() == 1
+    pg.click('[data-fe="ok"]'); pg.wait_for_timeout(200)
+    check("'+ 더 넣기' 메뉴가 열리고 플로우차트 넣기", menu_ok and fe and pg.locator("#ed div.flow").count() == 1, f"{menu_ok},{fe}")
+    pg.click("#edCancel"); pg.wait_for_timeout(100)
+    if pg.locator("#askOk").count(): pg.click("#askOk"); pg.wait_for_timeout(200)
     check("자바스크립트 오류 없음", not errs, "; ".join(errs[:3]))
     b.close()
 srv.shutdown()
