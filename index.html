@@ -795,6 +795,7 @@ function sanitize(html){
       }
       if (t === "FIGURE") { const w = ["w-s", "w-m"].find(c => n.classList && n.classList.contains(c)); if (w) e.className = w; }
       if (t === "UL" && n.classList && n.classList.contains("check")) e.className = "check";
+      if (t === "OL") { const v = parseInt(n.getAttribute("start")); if (v > 1 && v < 1000) e.setAttribute("start", v); }
       if (t === "UL" && n.classList && n.classList.contains("decision")) e.className = "decision";
       if (/^(P|H[1-6]|LI)$/.test(t) && n.classList) { const cs = [...n.classList].filter(c => /^(al-[cr]|in-[1-6]|lh-[134])$/.test(c) || (t === "LI" && c === "done")); if (cs.length) e.className = cs.join(" "); }
       if ((t === "TD" || t === "TH")) { ["colspan", "rowspan"].forEach(a => { const v = parseInt(n.getAttribute(a)); if (v > 1 && v < 50) e.setAttribute(a, v); });
@@ -935,6 +936,13 @@ function blockAuto(){ /* 줄 맨 앞: ## , * , 1. , > , ``` , --- , [] , <> + �
   let b = n.parentElement.closest("p,h1,h2,h3,h4,h5,h6,li,blockquote,pre,td,th,figure,div");
   if (!b) return false;
   if (b.tagName === "DIV") { b = wrapP(n); caretTo(n, o); }
+  if (b.tagName === "LI" && !b.parentNode.matches("ul.check,ul.decision") && !n.parentElement.closest("code,a")) { /* 목록 줄에서 [] + 띄어쓰기 → 그 줄을 할 일로 */
+    const tail = n.data.slice(Math.max(0, o - 4), o).replace(/\u00a0/g, " "), rr = document.createRange(); rr.setStart(b, 0); rr.setEnd(n, o);
+    const atStart = /^\[\] $/.test(rr.toString().replace(/\u00a0/g, " ").replace(/\u200b/g, ""));
+    if (atStart || /(^|\s)\[\] $/.test(tail.length === 4 ? tail : " " + tail)) {
+      snapNow(n, o); n.deleteData(o - 3, 3); const keep = o - 3; if (keep > 0 && n.data[keep - 1] === " ") n.replaceData(keep - 1, 1, "\u00a0");
+      liToTask(b); if (n.isConnected) caretTo(n, Math.min(keep, n.data.length)); return true; }
+    return false; }
   if (!b.matches("p:not(.xtitle),h1,h2,h3,h4,h5,h6")) return false;
   const r = document.createRange(); r.setStart(b, 0); r.setEnd(n, o);
   const m = BLOCK_RE.exec(r.toString().replace(/\u00a0/g, " ").replace(/\u200b/g, ""));
@@ -944,6 +952,17 @@ function blockAuto(){ /* 줄 맨 앞: ## , * , 1. , > , ``` , --- , [] , <> + �
       snapNow(n, o); n.deleteData(o - 3, 3); const keep = o - 3; if (keep > 0 && n.data[keep - 1] === " ") n.replaceData(keep - 1, 1, "\u00a0"); convertBlock(b, "[]"); if (n.isConnected) caretTo(n, Math.min(keep, n.data.length)); return true; }
     return false; }
   snapNow(n, o); r.deleteContents(); convertBlock(b, m[1]); return true;
+}
+/* 번호·글머리 목록의 한 줄을 할 일 목록으로 빼기 (앞뒤 줄은 원래 목록 그대로) */
+function liToTask(li){
+  const list = li.parentNode, after = [];
+  for (let x = li.nextElementSibling; x; x = x.nextElementSibling) after.push(x);
+  const ul = document.createElement("ul"); ul.className = "check"; list.after(ul); ul.appendChild(li);
+  if (after.length) { const rest = document.createElement(list.tagName); if (list.className) rest.className = list.className;
+    if (list.tagName === "OL") rest.setAttribute("start", list.children.length - after.length + 1 + (parseInt(list.getAttribute("start")) || 1)); after.forEach(x => rest.appendChild(x)); ul.after(rest); }
+  if (!list.children.length) list.remove();
+  const prev = ul.previousElementSibling; if (prev && prev.matches("ul.check")) { while (ul.firstChild) prev.appendChild(ul.firstChild); ul.remove(); markDue(prev); return; }
+  markDue(ul);
 }
 /* 할 일 속 날짜: 지나면 빨강, 오늘이면 노랑, 끝낸 일은 회색 */
 function markDue(root){

@@ -581,6 +581,15 @@ with sync_playwright() as p:
     check("표 칸 경계 끌어서 너비 바꾸기·저장·되돌리기", c1["width"] < c0["width"] - 100 and 'width="' in html and abs(c2["width"] - c0["width"]) < 3, f"{c0['width']},{c1['width']},{c2['width']},{html}")
     pg.click("#edCancel"); pg.wait_for_timeout(100)
     if pg.locator("#askOk").count(): pg.click("#askOk"); pg.wait_for_timeout(200)
+
+    # 35) 번호 목록 줄에서 [] + 띄어쓰기 → 할 일
+    pg.goto(URL + "#/"); pg.wait_for_timeout(150); pg.click("#createBtn"); pg.wait_for_timeout(250); pg.fill("#edTitle", "목록 할 일"); pg.click("#ed")
+    pg.evaluate("(() => { const e = document.querySelector('#ed'); e.innerHTML = '<ol><li>하나</li><li><a class=\"plink\" data-page=\"x1\" href=\"#/p/x1\">배회</a>\u00a0</li><li>셋</li></ol><p>끝</p>'; caretIn(e.querySelectorAll('li')[1], true); })()")
+    pg.keyboard.type("[] "); pg.wait_for_timeout(80)
+    html = pg.evaluate("sanitize(document.querySelector('#ed').innerHTML)")
+    check("목록 줄 중간 [] → 그 줄만 할 일 (번호 이어짐)", html.startswith('<ol><li>하나</li></ol><ul class="check"><li><a') and '<ol start="3"><li>셋</li></ol>' in html, html)
+    pg.click("#edCancel"); pg.wait_for_timeout(100)
+    if pg.locator("#askOk").count(): pg.click("#askOk"); pg.wait_for_timeout(200)
     check("자바스크립트 오류 없음", not errs, "; ".join(errs[:3]))
     b.close()
 srv.shutdown()
