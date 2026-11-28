@@ -409,6 +409,28 @@ with sync_playwright() as p:
     check("모든 넣기·서식 동작 반응 + Ctrl+Z/Alt+Z 되돌리기 + Ctrl+Y 다시 하기", not bad, " / ".join(bad))
     pg.click("#edCancel"); pg.wait_for_timeout(100)
     if pg.locator("#askOk").count(): pg.click("#askOk"); pg.wait_for_timeout(200)
+
+    # 24) 목록 Tab·Shift+Tab·Backspace·Enter, 보통 줄 들여쓰기, 표 Tab 이동
+    pg.goto(URL + "#/"); pg.wait_for_timeout(150); pg.click("#createBtn"); pg.wait_for_timeout(250); pg.fill("#edTitle", "목록 키"); pg.click("#ed")
+    def put(html, sel, off=0):
+        pg.evaluate("([h,q,o]) => { const e = document.querySelector('#ed'); e.__u = null; e.innerHTML = h; e.focus(); const t = e.querySelector(q); const n = t.firstChild && t.firstChild.nodeType === 3 ? t.firstChild : t; const r = document.createRange(); r.setStart(n, o); getSelection().removeAllRanges(); getSelection().addRange(r); }", [html, sel, off])
+    edh = lambda: pg.evaluate("sanitize(document.querySelector('#ed').innerHTML)").replace("&nbsp;", " ")
+    res = {}
+    for tag in ["ol", "ul"]:
+        put(f"<{tag}><li>Counter</li><li>둘</li><li>셋</li></{tag}>", "li:nth-child(2)"); pg.keyboard.press("Tab"); a = edh()
+        res[tag + " Tab"] = a == f"<{tag}><li>Counter<{tag}><li>둘</li></{tag}></li><li>셋</li></{tag}>"
+        pg.keyboard.press("Shift+Tab"); res[tag + " Shift+Tab"] = edh() == f"<{tag}><li>Counter</li><li>둘</li><li>셋</li></{tag}>"
+        pg.keyboard.press("Shift+Tab"); res[tag + " Shift+Tab 맨바깥→글"] = edh() == f"<{tag}><li>Counter</li></{tag}><p>둘</p><{tag}><li>셋</li></{tag}>"
+        put(f"<{tag}><li>Counter</li><li><br></li></{tag}>", "li:first-child", 0); pg.keyboard.press("Backspace"); res[tag + " 첫 항목 Backspace"] = edh() == f"<p>Counter</p><{tag}><li></li></{tag}>" or edh() == f"<p>Counter</p><{tag}><li><br></li></{tag}>"
+        put(f"<{tag}><li>a<{tag}><li><br></li></{tag}></li></{tag}>", "li li", 0); pg.keyboard.press("Enter"); res[tag + " 빈 하위 Enter"] = edh().startswith(f"<{tag}><li>a</li><li>")
+    put("<p>들여쓰기</p>", "p", 0); pg.keyboard.press("Tab"); pg.keyboard.press("Tab"); r1 = edh(); pg.keyboard.press("Shift+Tab"); r2 = edh(); pg.keyboard.press("Control+z"); r3 = edh()
+    res["보통 줄 Tab/Shift+Tab/되돌리기"] = r1 == '<p class="in-2">들여쓰기</p>' and r2 == '<p class="in-1">들여쓰기</p>' and r3 == '<p class="in-2">들여쓰기</p>'
+    put("<table><tbody><tr><th>a</th><th>b</th></tr><tr><td>c</td><td>d</td></tr></tbody></table>", "th", 0); pg.keyboard.press("Tab"); pg.keyboard.type("X")
+    pg.keyboard.press("Tab"); pg.keyboard.press("Tab"); pg.keyboard.press("Tab"); pg.keyboard.type("Y"); t = edh()
+    res["표 Tab 이동·끝에서 줄 추가"] = "<th>X</th>" in t and t.count("<tr>") == 3 and "<td>Y</td>" in t
+    check("목록 Tab 들여쓰기·Shift+Tab 내어쓰기·첫 항목 Backspace·빈 항목 Enter·보통 줄·표", all(res.values()), str({k: v for k, v in res.items() if not v}))
+    pg.click("#edCancel"); pg.wait_for_timeout(100)
+    if pg.locator("#askOk").count(): pg.click("#askOk"); pg.wait_for_timeout(200)
     check("자바스크립트 오류 없음", not errs, "; ".join(errs[:3]))
     b.close()
 srv.shutdown()
